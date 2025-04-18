@@ -1,0 +1,50 @@
+name: Code style check
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Restore pip cache
+      uses: actions/cache@v2
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+
+    - name: Mypy tests
+      run: |
+        export DIFF_FILES=$(git diff --name-only --diff-filter=ACM $(git merge-base HEAD origin/master) | grep "\.py" | grep -v "settings" | grep -v "migrations")
+        if [[ ! -z $DIFF_FILES ]]
+        then
+          echo "[MYPY] Checking ..." $DIFF_FILES
+          mypy $DIFF_FILES --ignore-missing-imports --disallow-untyped-defs --follow-imports silent
+
+        fi
+
+    - name: Ruff tests
+      run: |
+        export DIFF_FILES=$(git diff --name-only --diff-filter=ACM $(git merge-base HEAD origin/master) | grep "\.py" | grep -v "settings" | grep -v "migrations")
+        if [[ ! -z $DIFF_FILES ]]
+        then
+          echo "[Ruff] Checking ..." $DIFF_FILES
+          ruff $DIFF_FILES
+
+        fi
