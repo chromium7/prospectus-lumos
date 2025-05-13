@@ -157,12 +157,8 @@ CACHES = {
 # REST Framework configs
 API_AUTHENTICATION_TOKEN = ''
 
-# S3 storage
-S3_CREDENTIALS = {
-    'AWS_ACCESS_KEY_ID': '',
-    'AWS_SECRET_ACCESS_KEY': '',
-    'MEDIA_BUCKET_NAME': '',
-}
+# Google cloud credentials
+GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE = ''
 
 FIXTURE_DIRS = (
     BASE_DIR / "tests/fixtures",
