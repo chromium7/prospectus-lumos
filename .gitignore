@@ -9,6 +9,7 @@ media
 static
 node_modules
 .DS_Store
+.ignore
 
 # vscode
 .vscode

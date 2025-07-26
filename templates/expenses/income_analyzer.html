@@ -1,0 +1,201 @@
+{% extends 'base.html' %}
+
+{% block title %}Income Analyzer - Prospectus Lumos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Income Analyzer</h1>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <label for="year" class="form-label">Year</label>
+                <select class="form-select" id="year" name="year">
+                    <option value="">All Years</option>
+                    {% for year in available_years %}
+                        <option value="{{ year }}" {% if year_filter == year|stringformat:"s" %}selected{% endif %}>
+                            {{ year }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="month" class="form-label">Month</label>
+                <select class="form-select" id="month" name="month">
+                    <option value="">All Months</option>
+                    {% for month_num, month_name in available_months %}
+                        <option value="{{ month_num }}" {% if month_filter == month_num|stringformat:"s" %}selected{% endif %}>
+                            {{ month_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="bi bi-funnel"></i> Apply Filter
+                </button>
+                <a href="{% url 'income_analyzer' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-circle"></i> Clear
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Summary Statistics -->
+<div class="row mb-4">
+    <div class="col-md-4 mb-3">
+        <div class="card stat-card income">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-subtitle mb-2 text-muted">Total Income {{ filter_text }}</h6>
+                        <h3 class="mb-0 text-success">Rp{{ analysis.total_income|floatformat:0 }}</h3>
+                    </div>
+                    <div class="text-success">
+                        <i class="bi bi-cash-stack" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 mb-3">
+        <div class="card stat-card income">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-subtitle mb-2 text-muted">Average Monthly Income</h6>
+                        <h3 class="mb-0 text-success">Rp{{ analysis.average_income|floatformat:0 }}</h3>
+                    </div>
+                    <div class="text-success">
+                        <i class="bi bi-graph-up" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 mb-3">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-subtitle mb-2 text-muted">Documents Analyzed</h6>
+                        <h3 class="mb-0">{{ analysis.document_count }}</h3>
+                    </div>
+                    <div class="text-primary">
+                        <i class="bi bi-file-earmark-check" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Income by Category -->
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Income by Category</h5>
+            </div>
+            <div class="card-body">
+                {% if analysis.income_by_category %}
+                    {% for category, data in analysis.income_by_category.items %}
+                    <div class="d-flex justify-content-between align-items-center mb-3 p-3 border rounded">
+                        <div>
+                            <h6 class="mb-1">{{ category }}</h6>
+                            <small class="text-muted">{{ data.count }} transactions • Avg: Rp{{ data.average|floatformat:0 }}</small>
+                        </div>
+                        <div class="text-end">
+                            <h5 class="text-success mb-0">Rp{{ data.total|floatformat:0 }}</h5>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-pie-chart text-muted" style="font-size: 3rem;"></i>
+                        <p class="mt-3 text-muted">No income data found for the selected period</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Monthly Income Table -->
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Income by Month</h5>
+            </div>
+            <div class="card-body">
+                {% if analysis.documents %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Month/Year</th>
+                                    <th class="text-end">Income</th>
+                                    <th class="text-end">Entries</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for doc in analysis.documents %}
+                                <tr>
+                                    <td>{{ doc.month_name }} {{ doc.year }}</td>
+                                    <td class="text-end text-success">
+                                        <strong>Rp{{ doc.total_income|floatformat:0 }}</strong>
+                                    </td>
+                                    <td class="text-end">
+                                        <span class="badge bg-success">{{ doc.income_count }}</span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-calendar-x text-muted" style="font-size: 3rem;"></i>
+                        <p class="mt-3 text-muted">No documents found for the selected period</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Additional Insights -->
+{% if analysis.income_by_category %}
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Income Insights</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Top Income Category</h6>
+                {% for category, data in analysis.income_by_category.items %}
+                    {% if forloop.first %}
+                    <p class="text-success">
+                        <strong>{{ category }}</strong> - Rp{{ data.total|floatformat:0 }}
+                        <small class="text-muted">({{ data.count }} transactions)</small>
+                    </p>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            <div class="col-md-6">
+                <h6>Categories</h6>
+                <p>
+                    <span class="badge bg-info">{{ analysis.income_by_category|length }} income categories</span>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
