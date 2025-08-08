@@ -9,6 +9,6 @@ psycopg2-binary==2.9.10
 Pillow==11.2.1
 # S3 storage
 paramiko==3.5.0
-boto3==1.36.7
+boto3==1.40.5
 # Google drive storage
 # google-api-python-client==2.117.0
