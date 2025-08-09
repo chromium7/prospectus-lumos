@@ -7,9 +7,9 @@ from django.views.decorators.http import require_http_methods
 from django.core.paginator import Paginator
 from django.db.models import Q
 
-from prospectus_lumos.accounts.models import DocumentSource
-from prospectus_lumos.documents.models import Document
-from .services import ExpenseSheetService, ExpenseAnalyzerService
+from prospectus_lumos.apps.accounts.models import DocumentSource
+from prospectus_lumos.apps.documents.models import Document
+from prospectus_lumos.apps.expenses.services import ExpenseSheetService, ExpenseAnalyzerService
 
 
 def login_view(request):

@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
-from prospectus_lumos.accounts.models import UserProfile, DocumentSource
+from prospectus_lumos.apps.accounts.models import UserProfile, DocumentSource
 
 
 class Command(BaseCommand):

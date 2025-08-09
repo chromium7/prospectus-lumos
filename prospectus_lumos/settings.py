@@ -45,10 +45,10 @@ INSTALLED_APPS = [
     'rest_framework',
 
     # Local apps
-    'prospectus_lumos.accounts',
-    'prospectus_lumos.documents',
-    'prospectus_lumos.transactions',
-    'prospectus_lumos.expenses',  # Keep for views and services
+    'prospectus_lumos.apps.accounts',
+    'prospectus_lumos.apps.documents',
+    'prospectus_lumos.apps.transactions',
+    'prospectus_lumos.apps.api',
 ]
 
 MIDDLEWARE = [

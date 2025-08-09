@@ -8,9 +8,9 @@ from django.core.files.base import ContentFile
 from django.utils import timezone
 
 from libraries.google_cloud.backends import GoogleDriveBackend
-from prospectus_lumos.accounts.models import DocumentSource
-from prospectus_lumos.documents.models import Document
-from prospectus_lumos.transactions.models import Transaction
+from prospectus_lumos.apps.accounts.models import DocumentSource
+from prospectus_lumos.apps.documents.models import Document
+from prospectus_lumos.apps.transactions.models import Transaction
 
 
 class ExpenseSheetService:

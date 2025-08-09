@@ -23,8 +23,8 @@ from django.urls import path, include
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("api/", include("prospectus_lumos.api.urls", namespace="api")),
-    path("", include("prospectus_lumos.expenses.urls")),
+    path("api/", include("prospectus_lumos.apps.api.urls", namespace="api")),
+    path("", include("prospectus_lumos.website.urls")),
 ]
 
 if settings.DEBUG:
