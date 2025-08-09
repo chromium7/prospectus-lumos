@@ -48,7 +48,6 @@ INSTALLED_APPS = [
     'prospectus_lumos.apps.accounts',
     'prospectus_lumos.apps.documents',
     'prospectus_lumos.apps.transactions',
-    'prospectus_lumos.apps.api',
 ]
 
 MIDDLEWARE = [
@@ -156,6 +155,7 @@ CACHES = {
 
 # REST Framework configs
 API_AUTHENTICATION_TOKEN = ''
+API_REQUIRES_HTTPS = True
 
 # Google cloud credentials
 GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE = ''
