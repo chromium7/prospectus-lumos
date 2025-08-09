@@ -1,0 +1,225 @@
+{% extends 'base.html' %}
+
+{% block title %}Expense Analyzer - Prospectus Lumos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Expense Analyzer</h1>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <label for="year" class="form-label">Year</label>
+                <select class="form-select" id="year" name="year">
+                    <option value="">All Years</option>
+                    {% for year in available_years %}
+                        <option value="{{ year }}" {% if year_filter == year|stringformat:"s" %}selected{% endif %}>
+                            {{ year }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="month" class="form-label">Month</label>
+                <select class="form-select" id="month" name="month">
+                    <option value="">All Months</option>
+                    {% for month_num, month_name in available_months %}
+                        <option value="{{ month_num }}" {% if month_filter == month_num|stringformat:"s" %}selected{% endif %}>
+                            {{ month_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="bi bi-funnel"></i> Apply Filter
+                </button>
+                <a href="{% url 'expense_analyzer' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-circle"></i> Clear
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Summary Statistics -->
+<div class="row mb-4">
+    <div class="col-md-4 mb-3">
+        <div class="card stat-card expense">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-subtitle mb-2 text-muted">Total Expenses {{ filter_text }}</h6>
+                        <h3 class="mb-0 text-danger">Rp{{ analysis.total_expenses|floatformat:0 }}</h3>
+                    </div>
+                    <div class="text-danger">
+                        <i class="bi bi-credit-card" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 mb-3">
+        <div class="card stat-card expense">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-subtitle mb-2 text-muted">Average Monthly Expenses</h6>
+                        <h3 class="mb-0 text-danger">Rp{{ analysis.average_expenses|floatformat:0 }}</h3>
+                    </div>
+                    <div class="text-danger">
+                        <i class="bi bi-graph-down" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 mb-3">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-subtitle mb-2 text-muted">Documents Analyzed</h6>
+                        <h3 class="mb-0">{{ analysis.document_count }}</h3>
+                    </div>
+                    <div class="text-primary">
+                        <i class="bi bi-file-earmark-check" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Expenses by Category -->
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Expenses by Category</h5>
+            </div>
+            <div class="card-body">
+                {% if analysis.expenses_by_category %}
+                    {% for category, data in analysis.expenses_by_category.items %}
+                    <div class="d-flex justify-content-between align-items-center mb-3 p-3 border rounded">
+                        <div>
+                            <h6 class="mb-1">{{ category }}</h6>
+                            <small class="text-muted">{{ data.count }} transactions • Avg: Rp{{ data.average|floatformat:0 }}</small>
+                        </div>
+                        <div class="text-end">
+                            <h5 class="text-danger mb-0">Rp{{ data.total|floatformat:0 }}</h5>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-pie-chart text-muted" style="font-size: 3rem;"></i>
+                        <p class="mt-3 text-muted">No expense data found for the selected period</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Monthly Expenses Table -->
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Expenses by Month</h5>
+            </div>
+            <div class="card-body">
+                {% if analysis.documents %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Month/Year</th>
+                                    <th class="text-end">Expenses</th>
+                                    <th class="text-end">Entries</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for doc in analysis.documents %}
+                                <tr>
+                                    <td>{{ doc.month_name }} {{ doc.year }}</td>
+                                    <td class="text-end text-danger">
+                                        <strong>Rp{{ doc.total_expenses|floatformat:0 }}</strong>
+                                    </td>
+                                    <td class="text-end">
+                                        <span class="badge bg-danger">{{ doc.expenses_count }}</span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-calendar-x text-muted" style="font-size: 3rem;"></i>
+                        <p class="mt-3 text-muted">No documents found for the selected period</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Additional Insights -->
+{% if analysis.expenses_by_category %}
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Expense Insights</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Highest Expense Category</h6>
+                {% for category, data in analysis.expenses_by_category.items %}
+                    {% if forloop.first %}
+                    <p class="text-danger">
+                        <strong>{{ category }}</strong> - Rp{{ data.total|floatformat:0 }}
+                        <small class="text-muted">({{ data.count }} transactions)</small>
+                    </p>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            <div class="col-md-6">
+                <h6>Expense Categories</h6>
+                <p>
+                    <span class="badge bg-info">{{ analysis.expenses_by_category|length }} expense categories</span>
+                </p>
+            </div>
+        </div>
+
+        {% if analysis.expenses_by_category|length > 1 %}
+        <div class="row mt-3">
+            <div class="col-12">
+                <h6>Category Breakdown</h6>
+                <div class="row">
+                    {% for category, data in analysis.expenses_by_category.items %}
+                    <div class="col-md-4 mb-2">
+                        <div class="d-flex justify-content-between small">
+                            <span>{{ category|truncatechars:15 }}</span>
+                            <span class="text-danger">
+                                {% widthratio data.total analysis.total_expenses 100 %}%
+                            </span>
+                        </div>
+                        <div class="progress" style="height: 4px;">
+                            <div class="progress-bar bg-danger" role="progressbar"
+                                 style="width: {% widthratio data.total analysis.total_expenses 100 %}%"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

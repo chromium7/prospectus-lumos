@@ -18,10 +18,9 @@ class IsSecure(BasePermission):
         if not settings.API_REQUIRES_HTTPS:
             return True
 
-        if not settings.TEST and get_client_ip(request).startswith('127.0.0.1'):
+        if not settings.TEST and get_client_ip(request).startswith("127.0.0.1"):
             return True
 
         if not settings.DEBUG and not request.is_secure():
-            raise Response({'message': 'HTTPS connection is required'},
-                           status_code=status.HTTP_403_FORBIDDEN)
+            raise Response({"message": "HTTPS connection is required"}, status_code=status.HTTP_403_FORBIDDEN)
         return True

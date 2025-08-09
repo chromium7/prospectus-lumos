@@ -45,6 +45,9 @@ INSTALLED_APPS = [
     'rest_framework',
 
     # Local apps
+    'prospectus_lumos.apps.accounts',
+    'prospectus_lumos.apps.documents',
+    'prospectus_lumos.apps.transactions',
 ]
 
 MIDDLEWARE = [
@@ -62,7 +65,7 @@ ROOT_URLCONF = 'prospectus_lumos.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -83,12 +86,8 @@ WSGI_APPLICATION = 'prospectus_lumos.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': '',
-        'USER': '',
-        'PASSWORD': '',
-        'HOST': '',
-        'PORT': '',
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
@@ -139,7 +138,7 @@ MEDIA_ROOT = SETTINGS_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Custom user model
-# AUTH_USER_MODEL = 'users.User'
+# AUTH_USER_MODEL = 'expenses.User'
 
 # Redis
 REDIS_PASSWORD = ""
@@ -156,6 +155,7 @@ CACHES = {
 
 # REST Framework configs
 API_AUTHENTICATION_TOKEN = ''
+API_REQUIRES_HTTPS = True
 
 # Google cloud credentials
 GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE = ''

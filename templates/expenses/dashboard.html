@@ -1,0 +1,217 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Prospectus Lumos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Dashboard</h1>
+
+    {% if document_sources %}
+    <form method="post" action="{% url 'sync_documents' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-arrow-clockwise me-2"></i>
+            Sync Documents
+        </button>
+    </form>
+    {% endif %}
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-subtitle mb-2 text-muted">Total Documents</h6>
+                        <h3 class="mb-0">{{ total_documents }}</h3>
+                    </div>
+                    <div class="text-primary">
+                        <i class="bi bi-file-earmark-spreadsheet" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-3">
+        <div class="card stat-card income">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-subtitle mb-2 text-muted">Total Income</h6>
+                        <h3 class="mb-0">Rp{{ total_income|floatformat:0 }}</h3>
+                    </div>
+                    <div class="text-success">
+                        <i class="bi bi-graph-up" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-3">
+        <div class="card stat-card expense">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-subtitle mb-2 text-muted">Total Expenses</h6>
+                        <h3 class="mb-0">Rp{{ total_expenses|floatformat:0 }}</h3>
+                    </div>
+                    <div class="text-danger">
+                        <i class="bi bi-graph-down" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-3">
+        <div class="card stat-card net">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-subtitle mb-2 text-muted">Net Income</h6>
+                        <h3 class="mb-0 {% if net_income >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            Rp{{ net_income|floatformat:0 }}
+                        </h3>
+                    </div>
+                    <div class="{% if net_income >= 0 %}text-warning{% else %}text-danger{% endif %}">
+                        <i class="bi bi-{% if net_income >= 0 %}trending-up{% else %}trending-down{% endif %}" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Recent Documents -->
+    <div class="col-lg-8 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Recent Documents</h5>
+                <a href="{% url 'document_list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body">
+                {% if recent_documents %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Month/Year</th>
+                                    <th>Sheet Name</th>
+                                    <th class="text-end">Income</th>
+                                    <th class="text-end">Expenses</th>
+                                    <th class="text-end">Net</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for doc in recent_documents %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ doc.month_name }} {{ doc.year }}</strong>
+                                    </td>
+                                    <td>{{ doc.google_sheet_name|default:"Manual Upload" }}</td>
+                                    <td class="text-end text-success">Rp{{ doc.total_income|floatformat:0 }}</td>
+                                    <td class="text-end text-danger">Rp{{ doc.total_expenses|floatformat:0 }}</td>
+                                    <td class="text-end {% if doc.net_income >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                        Rp{{ doc.net_income|floatformat:0 }}
+                                    </td>
+                                    <td class="text-end">
+                                        <a href="{% url 'download_csv' doc.id %}" class="btn btn-sm btn-outline-secondary">
+                                            <i class="bi bi-download"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-file-earmark-x text-muted" style="font-size: 3rem;"></i>
+                        <h5 class="mt-3 text-muted">No Documents Yet</h5>
+                        <p class="text-muted">
+                            {% if document_sources %}
+                                Click "Sync Documents" to import your Google Sheets
+                            {% else %}
+                                Configure your document sources in the admin panel
+                            {% endif %}
+                        </p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Document Sources -->
+    <div class="col-lg-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Document Sources</h5>
+            </div>
+            <div class="card-body">
+                {% if document_sources %}
+                    {% for source in document_sources %}
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="me-3">
+                            {% if source.source_type == 'google_drive' %}
+                                <i class="bi bi-google text-primary" style="font-size: 1.5rem;"></i>
+                            {% else %}
+                                <i class="bi bi-cloud-upload text-secondary" style="font-size: 1.5rem;"></i>
+                            {% endif %}
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1">{{ source.name }}</h6>
+                            <small class="text-muted">
+                                {{ source.get_source_type_display }}
+                                {% if source.last_sync %}
+                                    • Last sync: {{ source.last_sync|date:"M d, Y H:i" }}
+                                {% endif %}
+                            </small>
+                        </div>
+                        <div>
+                            <span class="badge {% if source.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                                {% if source.is_active %}Active{% else %}Inactive{% endif %}
+                            </span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-3">
+                        <i class="bi bi-plus-circle text-muted" style="font-size: 2rem;"></i>
+                        <p class="mt-2 text-muted mb-0">No sources configured</p>
+                        <small class="text-muted">Set up sources in admin panel</small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0">Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'income_analyzer' %}" class="btn btn-outline-success">
+                        <i class="bi bi-graph-up me-2"></i>
+                        Analyze Income
+                    </a>
+                    <a href="{% url 'expense_analyzer' %}" class="btn btn-outline-danger">
+                        <i class="bi bi-graph-down me-2"></i>
+                        Analyze Expenses
+                    </a>
+                    <a href="{% url 'document_list' %}" class="btn btn-outline-primary">
+                        <i class="bi bi-file-earmark-spreadsheet me-2"></i>
+                        View All Documents
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

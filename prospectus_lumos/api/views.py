@@ -10,7 +10,6 @@ from .permissions import IsSecure
 
 
 class BaseAPIView(APIView):
-
     permission_classes: tuple = (IsAuthenticated, IsSecure)
     authentication_classes: tuple = (SingleTokenAuthentication,)
 
@@ -19,10 +18,10 @@ class BaseAPIView(APIView):
 
 
 class Ping(BaseAPIView):
-    permission_classes = tuple()
+    permission_classes = ()
 
     def get(self, request: Request) -> Response:
-        return Response({'status': 'ok'})
+        return Response({"status": "ok"})
 
     def post(self, request: Request) -> Response:
-        return Response({'status': 'ok'})
+        return Response({"status": "ok"})
