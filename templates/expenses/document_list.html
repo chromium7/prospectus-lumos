@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+
+{% block title %}Documents - Prospectus Lumos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Documents</h1>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <label for="search" class="form-label">Search</label>
+                <input type="text" class="form-control" id="search" name="search"
+                       value="{{ search_query }}" placeholder="Search by sheet name, month, year...">
+            </div>
+            <div class="col-md-3">
+                <label for="year" class="form-label">Year</label>
+                <select class="form-select" id="year" name="year">
+                    <option value="">All Years</option>
+                    {% for year in available_years %}
+                        <option value="{{ year }}" {% if year_filter == year|stringformat:"s" %}selected{% endif %}>
+                            {{ year }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="month" class="form-label">Month</label>
+                <select class="form-select" id="month" name="month">
+                    <option value="">All Months</option>
+                    {% for month_num, month_name in available_months %}
+                        <option value="{{ month_num }}" {% if month_filter == month_num|stringformat:"s" %}selected{% endif %}>
+                            {{ month_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="bi bi-search"></i> Filter
+                </button>
+                <a href="{% url 'document_list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-circle"></i> Clear
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Documents Table -->
+<div class="card">
+    <div class="card-body">
+        {% if page_obj %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Month/Year</th>
+                            <th>Sheet Name</th>
+                            <th>Source</th>
+                            <th class="text-end">Income</th>
+                            <th class="text-end">Expenses</th>
+                            <th class="text-end">Net</th>
+                            <th class="text-end">Transactions</th>
+                            <th class="text-end">Processed</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for doc in page_obj %}
+                        <tr>
+                            <td>
+                                <strong>{{ doc.month_name }} {{ doc.year }}</strong>
+                            </td>
+                            <td>
+                                {% if doc.google_sheet_name %}
+                                    {{ doc.google_sheet_name }}
+                                    {% if doc.google_sheet_id %}
+                                        <small class="text-muted d-block">ID: {{ doc.google_sheet_id|truncatechars:15 }}</small>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-muted">Manual Upload</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge {% if doc.source.source_type == 'google_drive' %}bg-primary{% else %}bg-secondary{% endif %}">
+                                    {{ doc.source.get_source_type_display }}
+                                </span>
+                            </td>
+                            <td class="text-end text-success">
+                                <strong>Rp{{ doc.total_income|floatformat:0 }}</strong>
+                                <small class="text-muted d-block">{{ doc.income_count }} entries</small>
+                            </td>
+                            <td class="text-end text-danger">
+                                <strong>Rp{{ doc.total_expenses|floatformat:0 }}</strong>
+                                <small class="text-muted d-block">{{ doc.expenses_count }} entries</small>
+                            </td>
+                            <td class="text-end {% if doc.net_income >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                <strong>Rp{{ doc.net_income|floatformat:0 }}</strong>
+                            </td>
+                            <td class="text-end">
+                                <span class="badge bg-info">{{ doc.transactions.count }}</span>
+                            </td>
+                            <td class="text-end">
+                                <small class="text-muted">{{ doc.processed_at|date:"M d, Y" }}</small>
+                            </td>
+                            <td class="text-end">
+                                <a href="{% url 'download_csv' doc.id %}" class="btn btn-sm btn-outline-primary" title="Download CSV">
+                                    <i class="bi bi-download"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if page_obj.has_other_pages %}
+            <nav aria-label="Documents pagination" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if year_filter %}&year={{ year_filter }}{% endif %}{% if month_filter %}&month={{ month_filter }}{% endif %}">
+                                <i class="bi bi-chevron-left"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ num }}</span>
+                            </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if year_filter %}&year={{ year_filter }}{% endif %}{% if month_filter %}&month={{ month_filter }}{% endif %}">{{ num }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if year_filter %}&year={{ year_filter }}{% endif %}{% if month_filter %}&month={{ month_filter }}{% endif %}">
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+
+        {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-file-earmark-x text-muted" style="font-size: 4rem;"></i>
+                <h4 class="mt-3 text-muted">No Documents Found</h4>
+                <p class="text-muted">
+                    {% if search_query or year_filter or month_filter %}
+                        Try adjusting your search criteria or clearing the filters.
+                    {% else %}
+                        No documents have been processed yet. Set up your document sources and sync to get started.
+                    {% endif %}
+                </p>
+                {% if search_query or year_filter or month_filter %}
+                <a href="{% url 'document_list' %}" class="btn btn-outline-primary">
+                    <i class="bi bi-x-circle me-2"></i>Clear Filters
+                </a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Summary Info -->
+{% if page_obj %}
+<div class="mt-3">
+    <small class="text-muted">
+        Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} documents
+    </small>
+</div>
+{% endif %}
+{% endblock %}

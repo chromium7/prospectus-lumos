@@ -7,14 +7,16 @@ from django.forms import Form
 
 
 class ErrorResponse(Response):
-    def __init__(self,
-                 form: Optional[Form] = None,
-                 code: str = 'invalid_request',
-                 message: str = 'Failed to process request',
-                 *args: Any,
-                 **kwargs: Any) -> None:
-        if not kwargs.get('status'):
-            kwargs['status'] = status.HTTP_400_BAD_REQUEST
+    def __init__(
+        self,
+        form: Optional[Form] = None,
+        code: str = "invalid_request",
+        message: str = "Failed to process request",
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        if not kwargs.get("status"):
+            kwargs["status"] = status.HTTP_400_BAD_REQUEST
 
         super().__init__(*args, **kwargs)
 
@@ -24,18 +26,18 @@ class ErrorResponse(Response):
                 error = validation_errors[0]
                 errors.append(
                     {
-                        'code': error.code,
-                        'message': error.message,
-                        'field': field,
+                        "code": error.code,
+                        "message": error.message,
+                        "field": field,
                     }
                 )
         else:
             errors.append(
                 {
-                    'code': code,
-                    'message': message,
-                    'field': None,
+                    "code": code,
+                    "message": message,
+                    "field": None,
                 }
             )
 
-        self.data = {'errors': errors}
+        self.data = {"errors": errors}
