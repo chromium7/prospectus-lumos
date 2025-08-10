@@ -6,4 +6,4 @@ isort==6.0.0
 pre-commit==4.2.0
 
 # Types
-django-stubs==5.1.2
+django-stubs==5.1.3
