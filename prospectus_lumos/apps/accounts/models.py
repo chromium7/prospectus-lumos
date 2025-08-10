@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Any
+
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import FileExtensionValidator
@@ -10,7 +14,7 @@ class UserProfile(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.user.username} Profile"
 
 
@@ -32,10 +36,10 @@ class GoogleDriveCredentials(models.Model):
     class Meta:
         verbose_name_plural = "Google Drive Credentials"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.user.username} - Google Drive"
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:
         # Extract folder ID from URL if provided
         if self.drive_folder_url and not self.folder_id:
             # Extract folder ID from Google Drive URL
@@ -70,5 +74,5 @@ class DocumentSource(models.Model):
     class Meta:
         unique_together = ["user", "name"]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.user.username} - {self.name}"

@@ -3,6 +3,13 @@ from typing import Any
 
 from django.utils import timezone
 from django.template.defaultfilters import slugify
+from django.http import HttpRequest
+
+from prospectus_lumos.apps.accounts.models import User
+
+
+class TypedHttpRequest(HttpRequest):
+    user: User
 
 
 class FilenameGenerator:
@@ -14,11 +21,7 @@ class FilenameGenerator:
 
         filepath = pathlib.Path(filename)
         path = pathlib.Path(
-            self.prefix,
-            str(today.year),
-            str(today.month),
-            str(today.day),
-            slugify(filepath.stem)
+            self.prefix, str(today.year), str(today.month), str(today.day), slugify(filepath.stem)
         ).with_suffix(filepath.suffix)
 
-        return path
+        return path  # type: ignore

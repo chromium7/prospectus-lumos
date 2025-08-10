@@ -10,9 +10,10 @@ from django.db.models import Q
 from prospectus_lumos.apps.accounts.models import DocumentSource
 from prospectus_lumos.apps.documents.models import Document
 from prospectus_lumos.apps.expenses.services import ExpenseSheetService, ExpenseAnalyzerService
+from prospectus_lumos.core.utils import TypedHttpRequest
 
 
-def login_view(request):
+def login_view(request: TypedHttpRequest) -> HttpResponse:
     """User login page"""
     if request.user.is_authenticated:
         return redirect("dashboard")
@@ -32,7 +33,7 @@ def login_view(request):
     return render(request, "expenses/login.html")
 
 
-def logout_view(request):
+def logout_view(request: TypedHttpRequest) -> HttpResponse:
     """User logout"""
     logout(request)
     messages.success(request, "You have been logged out successfully")
@@ -40,7 +41,7 @@ def logout_view(request):
 
 
 @login_required
-def dashboard_view(request):
+def dashboard_view(request: TypedHttpRequest) -> HttpResponse:
     """Dashboard showing overview of user's financial data"""
     # Get recent documents
     recent_docs = Document.objects.filter(user=request.user).order_by("-year", "-month")[:6]
@@ -71,7 +72,7 @@ def dashboard_view(request):
 
 
 @login_required
-def document_list_view(request):
+def document_list_view(request: TypedHttpRequest) -> HttpResponse:
     """List of saved CSV documents"""
     documents = Document.objects.filter(user=request.user).order_by("-year", "-month")
 
@@ -131,7 +132,7 @@ def document_list_view(request):
 
 
 @login_required
-def income_analyzer_view(request):
+def income_analyzer_view(request: TypedHttpRequest) -> HttpResponse:
     """Income analyzer page with filtering and statistics"""
     analyzer = ExpenseAnalyzerService(request.user)
 
@@ -178,7 +179,7 @@ def income_analyzer_view(request):
 
 
 @login_required
-def expense_analyzer_view(request):
+def expense_analyzer_view(request: TypedHttpRequest) -> HttpResponse:
     """Expense analyzer page with filtering and statistics"""
     analyzer = ExpenseAnalyzerService(request.user)
 
@@ -226,7 +227,7 @@ def expense_analyzer_view(request):
 
 @login_required
 @require_http_methods(["POST"])
-def sync_documents_view(request):
+def sync_documents_view(request: TypedHttpRequest) -> HttpResponse:
     """Sync documents from Google Drive sources"""
     try:
         service = ExpenseSheetService(request.user)
@@ -255,7 +256,7 @@ def sync_documents_view(request):
 
 
 @login_required
-def download_csv_view(request, document_id):
+def download_csv_view(request: TypedHttpRequest, document_id: int) -> HttpResponse:
     """Download CSV file for a specific document"""
     document = get_object_or_404(Document, id=document_id, user=request.user)
 
