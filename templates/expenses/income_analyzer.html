@@ -106,17 +106,43 @@
             </div>
             <div class="card-body">
                 {% if analysis.income_by_category %}
-                    {% for category, data in analysis.income_by_category.items %}
-                    <div class="d-flex justify-content-between align-items-center mb-3 p-3 border rounded">
-                        <div>
-                            <h6 class="mb-1">{{ category }}</h6>
-                            <small class="text-muted">{{ data.count }} transactions • Avg: {{ data.average|idr }}</small>
-                        </div>
-                        <div class="text-end">
-                            <h5 class="text-success mb-0">{{ data.total|idr }}</h5>
+                    <div id="income-category-list">
+                        {% for category, data in analysis.income_by_category.items %}
+                            {% if forloop.counter <= 5 %}
+                            <div class="d-flex justify-content-between align-items-center mb-3 p-3 border rounded">
+                                <div>
+                                    <h6 class="mb-1">{{ category }}</h6>
+                                    <small class="text-muted">{{ data.count }} transactions • Avg: {{ data.average|idr }}</small>
+                                </div>
+                                <div class="text-end">
+                                    <h5 class="text-success mb-0">{{ data.total|idr }}</h5>
+                                </div>
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+
+                        <div id="income-category-collapse" class="collapse">
+                            {% for category, data in analysis.income_by_category.items %}
+                                {% if forloop.counter > 5 %}
+                                <div class="d-flex justify-content-between align-items-center mb-3 p-3 border rounded">
+                                    <div>
+                                        <h6 class="mb-1">{{ category }}</h6>
+                                        <small class="text-muted">{{ data.count }} transactions • Avg: {{ data.average|idr }}</small>
+                                    </div>
+                                    <div class="text-end">
+                                        <h5 class="text-success mb-0">{{ data.total|idr }}</h5>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            {% endfor %}
                         </div>
                     </div>
-                    {% endfor %}
+
+                    {% if analysis.income_by_category|length > 5 %}
+                    <div class="text-center mt-2">
+                        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#income-category-collapse" aria-expanded="false" id="income-category-toggle">Show all</button>
+                    </div>
+                    {% endif %}
                 {% else %}
                     <div class="text-center py-4">
                         <i class="bi bi-pie-chart text-muted" style="font-size: 3rem;"></i>
@@ -146,19 +172,41 @@
                             </thead>
                             <tbody>
                                 {% for doc in analysis.documents %}
-                                <tr>
-                                    <td>{{ doc.month_name }} {{ doc.year }}</td>
-                                    <td class="text-end text-success">
-                                        <strong>{{ doc.total_income|idr }}</strong>
-                                    </td>
-                                    <td class="text-end">
-                                        <span class="badge bg-success">{{ doc.income_count }}</span>
-                                    </td>
-                                </tr>
+                                    {% if forloop.counter <= 5 %}
+                                    <tr onclick="location.href='{% url 'income_analyzer' %}?year={{ doc.year }}&month={{ doc.month }}'" style="cursor: pointer;">
+                                        <td>{{ doc.month_name }} {{ doc.year }}</td>
+                                        <td class="text-end text-success">
+                                            <strong>{{ doc.total_income|idr }}</strong>
+                                        </td>
+                                        <td class="text-end">
+                                            <span class="badge bg-success">{{ doc.income_count }}</span>
+                                        </td>
+                                    </tr>
+                                    {% endif %}
+                                {% endfor %}
+                            </tbody>
+                            <tbody id="income-month-collapse" class="collapse">
+                                {% for doc in analysis.documents %}
+                                    {% if forloop.counter > 5 %}
+                                    <tr onclick="location.href='{% url 'income_analyzer' %}?year={{ doc.year }}&month={{ doc.month }}'" style="cursor: pointer;">
+                                        <td>{{ doc.month_name }} {{ doc.year }}</td>
+                                        <td class="text-end text-success">
+                                            <strong>{{ doc.total_income|idr }}</strong>
+                                        </td>
+                                        <td class="text-end">
+                                            <span class="badge bg-success">{{ doc.income_count }}</span>
+                                        </td>
+                                    </tr>
+                                    {% endif %}
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
+                    {% if analysis.documents|length > 5 %}
+                    <div class="text-center mt-2">
+                        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#income-month-collapse" aria-expanded="false" id="income-month-toggle">Show all</button>
+                    </div>
+                    {% endif %}
                 {% else %}
                     <div class="text-center py-4">
                         <i class="bi bi-calendar-x text-muted" style="font-size: 3rem;"></i>
@@ -196,7 +244,101 @@
                 </p>
             </div>
         </div>
+
+        <div class="row mt-3">
+            <div class="col-12 mb-3">
+                <h6>Income Trend</h6>
+                <div class="p-3 border rounded" style="max-width: 820px; margin: 0 auto;">
+                    <canvas id="incomeTrendChart"></canvas>
+                </div>
+            </div>
+            <div class="col-12">
+                <h6>Income Category Breakdown</h6>
+                <div class="p-3 border rounded chart-container" style="max-width: 640px; margin: 0 auto;">
+                    <canvas id="incomeCategoryChart"></canvas>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endif %}
+
+{% block extra_js %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+{% if analysis.income_by_category %}
+<script>
+  (function() {
+    // Trend chart
+    var tctx = document.getElementById('incomeTrendChart');
+    if (tctx) {
+      var tlabels = [
+        {% for doc in analysis.documents reversed %}
+          "{{ doc.month_name }} {{ doc.year }}"{% if not forloop.last %},{% endif %}
+        {% endfor %}
+      ];
+      var tvalues = [
+        {% for doc in analysis.documents reversed %}
+          {{ doc.total_income }}{% if not forloop.last %},{% endif %}
+        {% endfor %}
+      ];
+      new Chart(tctx, {
+        type: 'line',
+        data: { labels: tlabels, datasets: [{ label: 'Income', data: tvalues, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.15)', tension: 0.25, fill: true, pointRadius: 2 }]},
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          aspectRatio: 2.0,
+          plugins: { legend: { display: false } },
+          scales: { y: { ticks: { callback: (v)=> 'Rp' + new Intl.NumberFormat('id-ID').format(v) } } }
+        }
+      });
+    }
+
+    var ctx = document.getElementById('incomeCategoryChart');
+    if (!ctx) return;
+    var labels = [
+      {% for category, data in analysis.income_by_category.items %}
+        "{{ category|escapejs }}"{% if not forloop.last %},{% endif %}
+      {% endfor %}
+    ];
+    var values = [
+      {% for category, data in analysis.income_by_category.items %}
+        {{ data.total }}{% if not forloop.last %},{% endif %}
+      {% endfor %}
+    ];
+    var colors = [
+      '#10b981', '#22c55e', '#16a34a', '#059669', '#34d399', '#6ee7b7', '#86efac', '#4ade80', '#a7f3d0', '#bbf7d0'
+    ];
+    new Chart(ctx, {
+      type: 'pie',
+      data: { labels: labels, datasets: [{ data: values, backgroundColor: colors }]},
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        aspectRatio: 1.3,
+        plugins: {
+          legend: { position: 'bottom' },
+          datalabels: {
+            color: '#111',
+            font: { weight: '600', size: 11 },
+            formatter: (value, ctx) => {
+              const data = ctx.chart.data.datasets[0].data;
+              const total = data.reduce((a, b) => a + b, 0);
+              const pct = total ? (value / total) * 100 : 0;
+              const label = ctx.chart.data.labels[ctx.dataIndex] || '';
+              if (pct >= 5) return label + ' ' + pct.toFixed(1) + '%';
+              if (pct >= 2) return pct.toFixed(1) + '%';
+              return '';
+            }
+          }
+        }
+      },
+      plugins: [ChartDataLabels]
+    });
+  })();
+  </script>
+{% endif %}
+{% endblock %}
 {% endblock %}
