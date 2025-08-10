@@ -6,6 +6,7 @@ from django.http import HttpResponse
 from django.views.decorators.http import require_http_methods
 from django.core.paginator import Paginator
 from django.db.models import Q
+from collections import Counter
 
 from prospectus_lumos.apps.accounts.models import DocumentSource
 from prospectus_lumos.apps.documents.models import Document
@@ -278,3 +279,103 @@ def download_csv_view(request: TypedHttpRequest, document_id: int) -> HttpRespon
     except Exception as e:
         messages.error(request, f"Error downloading file: {str(e)}")
         return redirect("document_list")
+
+
+@login_required
+def category_analyzer_view(request: TypedHttpRequest) -> HttpResponse:
+    """Analyze a single category for income or expense with filters and insights"""
+    category_type = request.GET.get("type", "expense")  # 'expense' or 'income'
+    category_name = request.GET.get("category", "")
+    year_filter = request.GET.get("year", "")
+    month_filter = request.GET.get("month", "")
+
+    documents = Document.objects.filter(user=request.user)
+    if year_filter:
+        documents = documents.filter(year=int(year_filter))
+    if month_filter:
+        documents = documents.filter(month=int(month_filter))
+
+    # Prepare transactions for the selected category
+    transactions_qs = []
+    for doc in documents:
+        qs = doc.transactions.filter(transaction_type=category_type)
+        if category_name:
+            qs = qs.filter(category=category_name)
+        transactions_qs.extend(
+            list(qs.values("description", "amount", "category", "date", "document__month", "document__year"))
+        )
+
+    # Trend by month-year
+    trend: dict[str, float] = {}
+    for t in transactions_qs:
+        m = t["document__month"]
+        y = t["document__year"]
+        key = f"{y}-{m:02d}"
+        trend.setdefault(key, 0)
+        trend[key] += float(t["amount"])  # Decimal -> float for JS consumption
+
+    # Frequent items by description
+    desc_counts = Counter([t["description"] or "(No description)" for t in transactions_qs])
+    top_items = desc_counts.most_common(10)
+
+    # Top transaction by amount
+    top_tx = None
+    top_transactions = []
+    if transactions_qs:
+        top_tx = max(transactions_qs, key=lambda x: x["amount"])
+        top_transactions = sorted(transactions_qs, key=lambda x: x["amount"], reverse=True)[:5]
+
+    # Summary totals and averages
+    transactions_count = len(transactions_qs)
+    total_value = sum([t["amount"] for t in transactions_qs]) if transactions_qs else 0
+    # number of distinct months in trend for average
+    months_in_trend = len(trend.keys()) if trend else 0
+    average_value = (total_value / months_in_trend) if months_in_trend else 0
+
+    # Ordered trend arrays for chart (oldest -> newest)
+    trend_labels = []
+    trend_values = []
+    if trend:
+        ordered_keys = sorted(trend.keys())
+        trend_labels = ordered_keys
+        trend_values = [trend[k] for k in ordered_keys]
+
+    # Available facets
+    available_years = (
+        Document.objects.filter(user=request.user).values_list("year", flat=True).distinct().order_by("-year")
+    )
+    available_months = [
+        (1, "January"),
+        (2, "February"),
+        (3, "March"),
+        (4, "April"),
+        (5, "May"),
+        (6, "June"),
+        (7, "July"),
+        (8, "August"),
+        (9, "September"),
+        (10, "October"),
+        (11, "November"),
+        (12, "December"),
+    ]
+
+    context = {
+        "category_type": category_type,
+        "category_name": category_name,
+        "year_filter": year_filter,
+        "month_filter": month_filter,
+        "available_years": available_years,
+        "available_months": available_months,
+        "trend": trend,
+        "trend_labels": trend_labels,
+        "trend_values": trend_values,
+        "top_items": top_items,
+        "top_tx": top_tx,
+        "top_transactions": top_transactions,
+        "transactions_count": transactions_count,
+        "total_value": total_value,
+        "average_value": average_value,
+        "selected_tab": "expenses" if category_type == "expense" else "income",
+    }
+
+    return render(request, "expenses/category_analyzer.html", context)
