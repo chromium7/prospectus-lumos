@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from decimal import Decimal
+from typing import List
+
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import FileExtensionValidator
@@ -34,13 +39,13 @@ class Document(models.Model):
         unique_together = ["user", "month", "year"]
         ordering = ["-year", "-month"]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.user.username} - {self.year}/{self.month:02d}"
 
     @property
-    def month_name(self):
+    def month_name(self) -> str:
         """Return the month name"""
-        months = [
+        months: List[str] = [
             "",
             "January",
             "February",
@@ -58,6 +63,6 @@ class Document(models.Model):
         return months[self.month] if 1 <= self.month <= 12 else ""
 
     @property
-    def net_income(self):
+    def net_income(self) -> Decimal:
         """Calculate net income (income - expenses)"""
         return self.total_income - self.total_expenses

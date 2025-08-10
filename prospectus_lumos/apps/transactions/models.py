@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from django.db import models
 
 
@@ -20,5 +22,5 @@ class Transaction(models.Model):
     class Meta:
         ordering = ["date", "id"]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.transaction_type} - {self.description} - {self.amount}"
