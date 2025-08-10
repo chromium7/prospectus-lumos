@@ -14,4 +14,5 @@ urlpatterns = [
     # Actions
     path("sync-documents/", views.sync_documents_view, name="sync_documents"),
     path("download-csv/<int:document_id>/", views.download_csv_view, name="download_csv"),
+    path("resync-document/<int:document_id>/", views.resync_document_view, name="resync_document"),
 ]

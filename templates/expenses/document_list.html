@@ -109,6 +109,12 @@
                                 <small class="text-muted">{{ doc.processed_at|date:"M d, Y" }}</small>
                             </td>
                             <td class="text-end">
+                                <form method="post" action="{% url 'resync_document' doc.id %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button class="btn btn-sm btn-outline-secondary" title="Resync" {% if not doc.google_sheet_id %}disabled{% endif %}>
+                                        <i class="bi bi-arrow-repeat"></i>
+                                    </button>
+                                </form>
                                 <a href="{% url 'download_csv' doc.id %}" class="btn btn-sm btn-outline-primary" title="Download CSV">
                                     <i class="bi bi-download"></i>
                                 </a>

@@ -207,6 +207,51 @@ class ExpenseSheetService:
         # Bulk create transactions
         Transaction.objects.bulk_create(transactions)
 
+    def resync_document(self, document: Document) -> Document:
+        """Re-sync a single Google Drive-backed document.
+
+        Re-parses the Google Sheet, re-generates the CSV, updates totals/counters,
+        and replaces transactions to avoid duplicates.
+        """
+        source = document.source
+        if source.source_type != "google_drive" or not source.google_credentials:
+            raise ValueError("Document source must be Google Drive with valid credentials")
+
+        if not document.google_sheet_id:
+            raise ValueError("Document is missing google_sheet_id; cannot resync")
+
+        creds_path = source.google_credentials.service_account_file.path
+        backend = GoogleDriveBackend(creds_path)
+
+        # Parse sheet
+        expenses, income = backend.parse_monthly_budget_sheet(document.google_sheet_id)
+
+        # Create CSV content
+        csv_content = self._create_csv_content(expenses, income)
+
+        # Calculate totals
+        total_expenses = sum(Decimal(str(exp["amount"])) for exp in expenses)
+        total_income = sum(Decimal(str(inc["amount"])) for inc in income)
+
+        # Replace transactions and update document
+        document.transactions.all().delete()
+        document.total_expenses = total_expenses
+        document.total_income = total_income
+        document.expenses_count = len(expenses)
+        document.income_count = len(income)
+
+        csv_filename = f"{document.user.username}_{document.year}_{document.month:02d}.csv"
+        document.csv_file.save(csv_filename, ContentFile(csv_content.encode("utf-8")), save=False)
+        document.save()
+
+        self._create_transaction_records(document, expenses, income)
+
+        # Update last sync for the source for auditing
+        source.last_sync = timezone.now()
+        source.save(update_fields=["last_sync"])
+
+        return document
+
 
 class ExpenseAnalyzerService:
     """Service to analyze expenses and income data"""

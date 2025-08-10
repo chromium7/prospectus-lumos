@@ -282,6 +282,20 @@ def download_csv_view(request: TypedHttpRequest, document_id: int) -> HttpRespon
 
 
 @login_required
+@require_http_methods(["POST"])
+def resync_document_view(request: TypedHttpRequest, document_id: int) -> HttpResponse:
+    """Re-sync a single document from its Google Sheet, replacing transactions safely."""
+    document = get_object_or_404(Document, id=document_id, user=request.user)
+    try:
+        service = ExpenseSheetService(request.user)
+        service.resync_document(document)
+        messages.success(request, f"Resynced {document.google_sheet_name or 'document'} successfully")
+    except Exception as e:
+        messages.error(request, f"Resync failed: {str(e)}")
+    return redirect("document_list")
+
+
+@login_required
 def category_analyzer_view(request: TypedHttpRequest) -> HttpResponse:
     """Analyze a single category for income or expense with filters and insights"""
     category_type = request.GET.get("type", "expense")  # 'expense' or 'income'
