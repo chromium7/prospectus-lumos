@@ -2,9 +2,13 @@
 
 {% block title %}Dashboard - Prospectus Lumos{% endblock %}
 
+{% load formatting %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>Dashboard</h1>
+    <div>
+      <h1 class="mb-0">Dashboard</h1>
+      <small class="text-muted">Summary below reflects the latest 6 months of documents</small>
+    </div>
 
     {% if document_sources %}
     <form method="post" action="{% url 'sync_documents' %}">
@@ -40,8 +44,8 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
-                        <h6 class="card-subtitle mb-2 text-muted">Total Income</h6>
-                        <h3 class="mb-0">Rp{{ total_income|floatformat:0 }}</h3>
+                        <h6 class="card-subtitle mb-2 text-muted">Total Income <small class="text-muted">({{ summary_period }})</small></h6>
+                        <h3 class="mb-0">{{ total_income|idr }}</h3>
                     </div>
                     <div class="text-success">
                         <i class="bi bi-graph-up" style="font-size: 2rem;"></i>
@@ -56,8 +60,8 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
-                        <h6 class="card-subtitle mb-2 text-muted">Total Expenses</h6>
-                        <h3 class="mb-0">Rp{{ total_expenses|floatformat:0 }}</h3>
+                        <h6 class="card-subtitle mb-2 text-muted">Total Expenses <small class="text-muted">({{ summary_period }})</small></h6>
+                        <h3 class="mb-0">{{ total_expenses|idr }}</h3>
                     </div>
                     <div class="text-danger">
                         <i class="bi bi-graph-down" style="font-size: 2rem;"></i>
@@ -72,9 +76,9 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
-                        <h6 class="card-subtitle mb-2 text-muted">Net Income</h6>
+                        <h6 class="card-subtitle mb-2 text-muted">Net Income <small class="text-muted">({{ summary_period }})</small></h6>
                         <h3 class="mb-0 {% if net_income >= 0 %}text-success{% else %}text-danger{% endif %}">
-                            Rp{{ net_income|floatformat:0 }}
+                            {{ net_income|idr }}
                         </h3>
                     </div>
                     <div class="{% if net_income >= 0 %}text-warning{% else %}text-danger{% endif %}">
@@ -115,10 +119,10 @@
                                         <strong>{{ doc.month_name }} {{ doc.year }}</strong>
                                     </td>
                                     <td>{{ doc.google_sheet_name|default:"Manual Upload" }}</td>
-                                    <td class="text-end text-success">Rp{{ doc.total_income|floatformat:0 }}</td>
-                                    <td class="text-end text-danger">Rp{{ doc.total_expenses|floatformat:0 }}</td>
+                                    <td class="text-end text-success">{{ doc.total_income|idr }}</td>
+                                    <td class="text-end text-danger">{{ doc.total_expenses|idr }}</td>
                                     <td class="text-end {% if doc.net_income >= 0 %}text-success{% else %}text-danger{% endif %}">
-                                        Rp{{ doc.net_income|floatformat:0 }}
+                                        {{ doc.net_income|idr }}
                                     </td>
                                     <td class="text-end">
                                         <a href="{% url 'download_csv' doc.id %}" class="btn btn-sm btn-outline-secondary">

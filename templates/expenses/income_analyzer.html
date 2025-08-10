@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load formatting %}
 
 {% block title %}Income Analyzer - Prospectus Lumos{% endblock %}
 
@@ -53,7 +54,7 @@
                 <div class="d-flex justify-content-between">
                     <div>
                         <h6 class="card-subtitle mb-2 text-muted">Total Income {{ filter_text }}</h6>
-                        <h3 class="mb-0 text-success">Rp{{ analysis.total_income|floatformat:0 }}</h3>
+                        <h3 class="mb-0 text-success">{{ analysis.total_income|idr }}</h3>
                     </div>
                     <div class="text-success">
                         <i class="bi bi-cash-stack" style="font-size: 2rem;"></i>
@@ -69,7 +70,7 @@
                 <div class="d-flex justify-content-between">
                     <div>
                         <h6 class="card-subtitle mb-2 text-muted">Average Monthly Income</h6>
-                        <h3 class="mb-0 text-success">Rp{{ analysis.average_income|floatformat:0 }}</h3>
+                        <h3 class="mb-0 text-success">{{ analysis.average_income|idr }}</h3>
                     </div>
                     <div class="text-success">
                         <i class="bi bi-graph-up" style="font-size: 2rem;"></i>
@@ -109,10 +110,10 @@
                     <div class="d-flex justify-content-between align-items-center mb-3 p-3 border rounded">
                         <div>
                             <h6 class="mb-1">{{ category }}</h6>
-                            <small class="text-muted">{{ data.count }} transactions • Avg: Rp{{ data.average|floatformat:0 }}</small>
+                            <small class="text-muted">{{ data.count }} transactions • Avg: {{ data.average|idr }}</small>
                         </div>
                         <div class="text-end">
-                            <h5 class="text-success mb-0">Rp{{ data.total|floatformat:0 }}</h5>
+                            <h5 class="text-success mb-0">{{ data.total|idr }}</h5>
                         </div>
                     </div>
                     {% endfor %}
@@ -148,7 +149,7 @@
                                 <tr>
                                     <td>{{ doc.month_name }} {{ doc.year }}</td>
                                     <td class="text-end text-success">
-                                        <strong>Rp{{ doc.total_income|floatformat:0 }}</strong>
+                                        <strong>{{ doc.total_income|idr }}</strong>
                                     </td>
                                     <td class="text-end">
                                         <span class="badge bg-success">{{ doc.income_count }}</span>
@@ -182,7 +183,7 @@
                 {% for category, data in analysis.income_by_category.items %}
                     {% if forloop.first %}
                     <p class="text-success">
-                        <strong>{{ category }}</strong> - Rp{{ data.total|floatformat:0 }}
+                        <strong>{{ category }}</strong> - {{ data.total|idr }}
                         <small class="text-muted">({{ data.count }} transactions)</small>
                     </p>
                     {% endif %}

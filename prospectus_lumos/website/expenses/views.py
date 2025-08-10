@@ -66,6 +66,7 @@ def dashboard_view(request: TypedHttpRequest) -> HttpResponse:
         "total_income": total_income,
         "total_expenses": total_expenses,
         "net_income": net_income,
+        "summary_period": "latest 6 months",
         "selected_tab": "dashboard",
     }
 

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load formatting %}
 
 {% block title %}Documents - Prospectus Lumos{% endblock %}
 
@@ -91,15 +92,15 @@
                                 </span>
                             </td>
                             <td class="text-end text-success">
-                                <strong>Rp{{ doc.total_income|floatformat:0 }}</strong>
+                                <strong>{{ doc.total_income|idr }}</strong>
                                 <small class="text-muted d-block">{{ doc.income_count }} entries</small>
                             </td>
                             <td class="text-end text-danger">
-                                <strong>Rp{{ doc.total_expenses|floatformat:0 }}</strong>
+                                <strong>{{ doc.total_expenses|idr }}</strong>
                                 <small class="text-muted d-block">{{ doc.expenses_count }} entries</small>
                             </td>
                             <td class="text-end {% if doc.net_income >= 0 %}text-success{% else %}text-danger{% endif %}">
-                                <strong>Rp{{ doc.net_income|floatformat:0 }}</strong>
+                                <strong>{{ doc.net_income|idr }}</strong>
                             </td>
                             <td class="text-end">
                                 <span class="badge bg-info">{{ doc.transactions.count }}</span>

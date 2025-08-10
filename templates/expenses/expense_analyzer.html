@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load formatting %}
 
 {% block title %}Expense Analyzer - Prospectus Lumos{% endblock %}
 
@@ -53,7 +54,7 @@
                 <div class="d-flex justify-content-between">
                     <div>
                         <h6 class="card-subtitle mb-2 text-muted">Total Expenses {{ filter_text }}</h6>
-                        <h3 class="mb-0 text-danger">Rp{{ analysis.total_expenses|floatformat:0 }}</h3>
+                        <h3 class="mb-0 text-danger">{{ analysis.total_expenses|idr }}</h3>
                     </div>
                     <div class="text-danger">
                         <i class="bi bi-credit-card" style="font-size: 2rem;"></i>
@@ -69,7 +70,7 @@
                 <div class="d-flex justify-content-between">
                     <div>
                         <h6 class="card-subtitle mb-2 text-muted">Average Monthly Expenses</h6>
-                        <h3 class="mb-0 text-danger">Rp{{ analysis.average_expenses|floatformat:0 }}</h3>
+                        <h3 class="mb-0 text-danger">{{ analysis.average_expenses|idr }}</h3>
                     </div>
                     <div class="text-danger">
                         <i class="bi bi-graph-down" style="font-size: 2rem;"></i>
@@ -109,10 +110,10 @@
                     <div class="d-flex justify-content-between align-items-center mb-3 p-3 border rounded">
                         <div>
                             <h6 class="mb-1">{{ category }}</h6>
-                            <small class="text-muted">{{ data.count }} transactions • Avg: Rp{{ data.average|floatformat:0 }}</small>
+                             <small class="text-muted">{{ data.count }} transactions • Avg: {{ data.average|idr }}</small>
                         </div>
                         <div class="text-end">
-                            <h5 class="text-danger mb-0">Rp{{ data.total|floatformat:0 }}</h5>
+                            <h5 class="text-danger mb-0">{{ data.total|idr }}</h5>
                         </div>
                     </div>
                     {% endfor %}
@@ -148,7 +149,7 @@
                                 <tr>
                                     <td>{{ doc.month_name }} {{ doc.year }}</td>
                                     <td class="text-end text-danger">
-                                        <strong>Rp{{ doc.total_expenses|floatformat:0 }}</strong>
+                                        <strong>{{ doc.total_expenses|idr }}</strong>
                                     </td>
                                     <td class="text-end">
                                         <span class="badge bg-danger">{{ doc.expenses_count }}</span>
@@ -182,7 +183,7 @@
                 {% for category, data in analysis.expenses_by_category.items %}
                     {% if forloop.first %}
                     <p class="text-danger">
-                        <strong>{{ category }}</strong> - Rp{{ data.total|floatformat:0 }}
+                        <strong>{{ category }}</strong> - {{ data.total|idr }}
                         <small class="text-muted">({{ data.count }} transactions)</small>
                     </p>
                     {% endif %}
