@@ -22,7 +22,7 @@
       <tr>
         <td>{{ source.name }}</td>
         <td>{{ source.get_source_type_display }}</td>
-        <td>{{ source.is_active|yesno:"Yes,No" }}</td>
+        <td>{% if source.is_active %}Yes{% else %}No{% endif %}</td>
         <td>{{ source.last_sync|default:"-" }}</td>
         <td class="text-end">
           <a class="btn btn-sm btn-primary" href="{% url 'source_update' source.pk %}">Edit</a>

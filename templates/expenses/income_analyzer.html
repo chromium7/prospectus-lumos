@@ -109,7 +109,7 @@
                     <div id="income-category-list">
                         {% for category, data in analysis.income_by_category.items %}
                             {% if forloop.counter <= 5 %}
-                            <div class="d-flex justify-content-between align-items-center mb-3 p-3 border rounded">
+                            <div class="d-flex justify-content-between align-items-center mb-3 p-3 border rounded position-relative">
                                 <div>
                                     <h6 class="mb-1">{{ category }}</h6>
                                     <small class="text-muted">{{ data.count }} transactions • Avg: {{ data.average|idr }}</small>
@@ -117,6 +117,7 @@
                                 <div class="text-end">
                                     <h5 class="text-success mb-0">{{ data.total|idr }}</h5>
                                 </div>
+                                <a class="stretched-link" href="{% url 'category_analyzer' %}?type=income&category={{ category|urlencode }}{% if year_filter %}&year={{ year_filter }}{% endif %}{% if month_filter %}&month={{ month_filter }}{% endif %}"></a>
                             </div>
                             {% endif %}
                         {% endfor %}
@@ -124,7 +125,7 @@
                         <div id="income-category-collapse" class="collapse">
                             {% for category, data in analysis.income_by_category.items %}
                                 {% if forloop.counter > 5 %}
-                                <div class="d-flex justify-content-between align-items-center mb-3 p-3 border rounded">
+                                <div class="d-flex justify-content-between align-items-center mb-3 p-3 border rounded position-relative">
                                     <div>
                                         <h6 class="mb-1">{{ category }}</h6>
                                         <small class="text-muted">{{ data.count }} transactions • Avg: {{ data.average|idr }}</small>
@@ -132,6 +133,7 @@
                                     <div class="text-end">
                                         <h5 class="text-success mb-0">{{ data.total|idr }}</h5>
                                     </div>
+                                    <a class="stretched-link" href="{% url 'category_analyzer' %}?type=income&category={{ category|urlencode }}{% if year_filter %}&year={{ year_filter }}{% endif %}{% if month_filter %}&month={{ month_filter }}{% endif %}"></a>
                                 </div>
                                 {% endif %}
                             {% endfor %}

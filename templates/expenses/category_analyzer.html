@@ -1,0 +1,200 @@
+{% extends 'base.html' %}
+{% load formatting %}
+
+{% block title %}Category Analyzer - Prospectus Lumos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1>Category Analyzer</h1>
+</div>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <form method="get" class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label">Type</label>
+        <select name="type" class="form-select">
+          <option value="expense" {% if category_type == 'expense' %}selected{% endif %}>Expense</option>
+          <option value="income" {% if category_type == 'income' %}selected{% endif %}>Income</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Category</label>
+        <input type="text" name="category" value="{{ category_name }}" class="form-control" placeholder="e.g., Food"/>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Year</label>
+        <select name="year" class="form-select">
+          <option value="">All Years</option>
+          {% for year in available_years %}
+            <option value="{{ year }}" {% if year_filter == year|stringformat:'s' %}selected{% endif %}>{{ year }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Month</label>
+        <select name="month" class="form-select">
+          <option value="">All Months</option>
+          {% for m, name in available_months %}
+          <option value="{{ m }}" {% if month_filter == m|stringformat:'s' %}selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 d-flex align-items-end">
+        <button class="btn btn-primary me-2" type="submit"><i class="bi bi-funnel"></i> Apply</button>
+        <a class="btn btn-outline-secondary" href="{% url 'category_analyzer' %}"><i class="bi bi-x-circle"></i> Clear</a>
+      </div>
+    </form>
+  </div>
+  {% if category_name %}
+    <div class="card-footer text-muted">Showing results for "{{ category_name }}" ({{ category_type|title }})</div>
+  {% endif %}
+</div>
+
+<div class="row">
+  <!-- Summary Statistics -->
+  <div class="col-12 mb-4">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="card stat-card {% if category_type == 'expense' %}expense{% else %}income{% endif %}">
+          <div class="card-body">
+            <div class="d-flex justify-content-between">
+              <div>
+                <h6 class="card-subtitle mb-2 text-muted">Total {{ category_type|title }} (for selection)</h6>
+                <h3 class="mb-0 {% if category_type == 'expense' %}text-danger{% else %}text-success{% endif %}">{{ total_value|idr }}</h3>
+              </div>
+              <div class="text-primary">
+                <i class="bi bi-calculator" style="font-size: 2rem;"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card stat-card {% if category_type == 'expense' %}expense{% else %}income{% endif %}">
+          <div class="card-body">
+            <div class="d-flex justify-content-between">
+              <div>
+                <h6 class="card-subtitle mb-2 text-muted">Average per Month</h6>
+                <h3 class="mb-0 {% if category_type == 'expense' %}text-danger{% else %}text-success{% endif %}">{{ average_value|idr }}</h3>
+              </div>
+              <div class="text-primary">
+                <i class="bi bi-graph-up" style="font-size: 2rem;"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card stat-card">
+          <div class="card-body">
+            <div class="d-flex justify-content-between">
+              <div>
+                <h6 class="card-subtitle mb-2 text-muted">Transactions</h6>
+                <h3 class="mb-0">{{ transactions_count }}</h3>
+              </div>
+              <div class="text-primary">
+                <i class="bi bi-receipt" style="font-size: 2rem;"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-7 mb-4">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Trend</h5>
+      </div>
+      <div class="card-body">
+        {% if trend %}
+        <div class="p-2 border rounded" style="max-width: 900px; margin: 0 auto;">
+          <canvas id="trendChart"></canvas>
+        </div>
+        {% else %}
+        <div class="text-center text-muted">No data</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5 mb-4">
+    <div class="card mb-4">
+      <div class="card-header"><h5 class="mb-0">Most Frequent Items</h5></div>
+      <div class="card-body">
+        {% if top_items %}
+        <ul class="list-group">
+          {% for name, cnt in top_items %}
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            <span>{{ name }}</span>
+            <span class="badge bg-secondary">{{ cnt }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <div class="text-muted">No items</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h5 class="mb-0">Top {% if category_type == 'expense' %}Expense{% else %}Earning{% endif %} Transaction</h5></div>
+      <div class="card-body">
+        {% if top_transactions %}
+        <div class="list-group mb-3">
+          {% for tx in top_transactions %}
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+              <div class="fw-bold">{{ tx.description }}</div>
+              <div class="text-muted small">{{ tx.category|default:'Uncategorized' }} • {{ tx.date }}</div>
+            </div>
+            <div class="{% if category_type == 'expense' %}text-danger{% else %}text-success{% endif %} fw-bold">{{ tx.amount|idr }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% elif top_tx %}
+        <div class="d-flex justify-content-between">
+          <div>
+            <div class="fw-bold">{{ top_tx.description }}</div>
+            <div class="text-muted small">{{ top_tx.category|default:'Uncategorized' }} • {{ top_tx.date }}</div>
+          </div>
+          <div class="{% if category_type == 'expense' %}text-danger{% else %}text-success{% endif %} fw-bold">{{ top_tx.amount|idr }}</div>
+        </div>
+        {% else %}
+        <div class="text-muted">No transactions</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{% if trend %}
+<script>
+  (function(){
+    var ctx = document.getElementById('trendChart');
+    if (!ctx) return;
+    var labels = [
+      {% for key in trend_labels %}
+        "{{ key }}"{% if not forloop.last %},{% endif %}
+      {% endfor %}
+    ];
+    var values = [
+      {% for val in trend_values %}
+        {{ val }}{% if not forloop.last %},{% endif %}
+      {% endfor %}
+    ];
+    new Chart(ctx, {
+      type: 'line',
+      data: { labels: labels, datasets: [{ label: '{{ category_type|title }}', data: values, borderColor: '{% if category_type == "expense" %}#ef4444{% else %}#10b981{% endif %}', tension: 0.25, fill: false, pointRadius: 2 }]},
+      options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { ticks: { callback: (v)=> 'Rp' + new Intl.NumberFormat('id-ID').format(v) } } } }
+    });
+  })();
+</script>
+{% endif %}
+{% endblock %}
