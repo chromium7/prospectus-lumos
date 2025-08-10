@@ -1,7 +1,7 @@
 import csv
 import io
 import re
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Any
 from decimal import Decimal
 
 from django.core.files.base import ContentFile
@@ -16,7 +16,7 @@ from prospectus_lumos.apps.transactions.models import Transaction
 class ExpenseSheetService:
     """Service to handle Google Drive sheet parsing and CSV creation"""
 
-    def __init__(self, user):
+    def __init__(self, user: Any) -> None:
         self.user = user
 
     def sync_google_drive_documents(self, source: DocumentSource) -> List[Document]:
@@ -28,11 +28,8 @@ class ExpenseSheetService:
         creds_path = source.google_credentials.service_account_file.path
         backend = GoogleDriveBackend(creds_path)
 
-        # Get folder path from credentials
-        folder_path = source.google_credentials.folder_id or ""
-
         # List monthly budget files
-        budget_files = backend.list_monthly_budget_files(folder_path)
+        budget_files = backend.list_monthly_budget_files()
 
         processed_documents = []
 
@@ -141,7 +138,7 @@ class ExpenseSheetService:
 
         return month, year
 
-    def _create_csv_content(self, expenses: List[Dict], income: List[Dict]) -> str:
+    def _create_csv_content(self, expenses: List[Dict[str, Any]], income: List[Dict[str, Any]]) -> str:
         """Create CSV content from expenses and income data"""
         output = io.StringIO()
         writer = csv.writer(output)
@@ -175,7 +172,9 @@ class ExpenseSheetService:
 
         return output.getvalue()
 
-    def _create_transaction_records(self, document: Document, expenses: List[Dict], income: List[Dict]):
+    def _create_transaction_records(
+        self, document: Document, expenses: List[Dict[str, Any]], income: List[Dict[str, Any]]
+    ) -> None:
         """Create transaction records from parsed data"""
         transactions = []
 
@@ -212,10 +211,10 @@ class ExpenseSheetService:
 class ExpenseAnalyzerService:
     """Service to analyze expenses and income data"""
 
-    def __init__(self, user):
+    def __init__(self, user: Any) -> None:
         self.user = user
 
-    def get_income_analysis(self, year: int = None, month: int = None) -> Dict:
+    def get_income_analysis(self, year: int | None = None, month: int | None = None) -> Dict[str, Any]:
         """Get income analysis for specified period"""
         documents = Document.objects.filter(user=self.user)
 
@@ -225,12 +224,12 @@ class ExpenseAnalyzerService:
             documents = documents.filter(month=month)
 
         # Calculate totals
-        total_income = sum(doc.total_income for doc in documents)
-        document_count = documents.count()
-        average_income = total_income / document_count if document_count > 0 else 0
+        total_income: Decimal = sum((doc.total_income for doc in documents), Decimal("0"))
+        document_count: int = documents.count()
+        average_income: Decimal | int = total_income / document_count if document_count > 0 else 0
 
         # Group by category
-        income_by_category = {}
+        income_by_category: Dict[str, Dict[str, Any]] = {}
         for doc in documents:
             income_transactions = doc.transactions.filter(transaction_type="income")
             for transaction in income_transactions:
@@ -242,7 +241,9 @@ class ExpenseAnalyzerService:
 
         # Calculate averages for categories
         for category_data in income_by_category.values():
-            category_data["average"] = category_data["total"] / category_data["count"]
+            category_data["average"] = (
+                category_data["total"] / category_data["count"] if category_data["count"] else Decimal("0")
+            )
 
         return {
             "total_income": total_income,
@@ -252,7 +253,7 @@ class ExpenseAnalyzerService:
             "documents": documents.order_by("-year", "-month"),
         }
 
-    def get_expense_analysis(self, year: int = None, month: int = None) -> Dict:
+    def get_expense_analysis(self, year: int | None = None, month: int | None = None) -> Dict[str, Any]:
         """Get expense analysis for specified period"""
         documents = Document.objects.filter(user=self.user)
 
@@ -262,12 +263,12 @@ class ExpenseAnalyzerService:
             documents = documents.filter(month=month)
 
         # Calculate totals
-        total_expenses = sum(doc.total_expenses for doc in documents)
-        document_count = documents.count()
-        average_expenses = total_expenses / document_count if document_count > 0 else 0
+        total_expenses: Decimal = sum((doc.total_expenses for doc in documents), Decimal("0"))
+        document_count: int = documents.count()
+        average_expenses: Decimal | int = total_expenses / document_count if document_count > 0 else 0
 
         # Group by category
-        expenses_by_category = {}
+        expenses_by_category: Dict[str, Dict[str, Any]] = {}
         for doc in documents:
             expense_transactions = doc.transactions.filter(transaction_type="expense")
             for transaction in expense_transactions:
@@ -279,7 +280,9 @@ class ExpenseAnalyzerService:
 
         # Calculate averages for categories
         for category_data in expenses_by_category.values():
-            category_data["average"] = category_data["total"] / category_data["count"]
+            category_data["average"] = (
+                category_data["total"] / category_data["count"] if category_data["count"] else Decimal("0")
+            )
 
         return {
             "total_expenses": total_expenses,

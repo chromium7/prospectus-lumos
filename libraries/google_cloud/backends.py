@@ -1,6 +1,6 @@
 import mimetypes
 from pathlib import Path
-from typing import Iterable, List, Optional, IO
+from typing import Iterable, List, Optional, IO, Any, Dict, Tuple
 
 # Google drive
 from google.oauth2.service_account import Credentials
@@ -149,7 +149,7 @@ class GoogleDriveBackend:
     def delete_file(self, key: str) -> None:
         self.drive_client.files().delete(fileId=key).execute()
 
-    def open_sheet(self, id: str, sheet_name: str | None = None, range: str | None = None):
+    def open_sheet(self, id: str, sheet_name: str | None = None, range: str | None = None) -> Dict[str, Any]:
         """Open and read data from a Google Sheet"""
         if sheet_name and range:
             range_param = f"{sheet_name}!{range}"
@@ -162,118 +162,143 @@ class GoogleDriveBackend:
 
         return self.sheets_client.spreadsheets().values().get(spreadsheetId=id, range=range_param).execute()
 
-    def get_sheet_names(self, id: str):
+    def get_sheet_names(self, id: str) -> List[str]:
         """Get all sheet names from a spreadsheet"""
         spreadsheet = self.sheets_client.spreadsheets().get(spreadsheetId=id).execute()
         return [sheet["properties"]["title"] for sheet in spreadsheet["sheets"]]
 
-    def parse_monthly_budget_sheet(self, sheet_id: str):
+    def parse_monthly_budget_sheet(self, sheet_id: str) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """
         Parse a monthly budget Google Sheet and extract expenses and income data.
-        Expected to find 'Transactions' sheet with expenses and income tables.
+
+        Many templates place "Expenses" and "Income" side-by-side with optional
+        leading empty columns. This parser:
+          - Locates the row containing the section titles ("Expenses"/"Income")
+            anywhere in the row, not just the first column
+          - Detects the corresponding header row (Date, Amount, Description, Category)
+            for each section and records the starting column index
+          - Iterates subsequent rows and extracts both sections in parallel
         """
         try:
-            # Get all sheet names first
+            # Discover the transactions sheet
             sheet_names = self.get_sheet_names(sheet_id)
+            if not sheet_names:
+                return [], []
 
-            # Look for 'Transactions' sheet (second sheet as mentioned in requirements)
             transactions_sheet = None
-            if len(sheet_names) > 1:
-                transactions_sheet = sheet_names[1]  # Second sheet
-            elif "Transactions" in sheet_names:
-                transactions_sheet = "Transactions"
-            else:
-                # Fallback to first available sheet
-                transactions_sheet = sheet_names[0] if sheet_names else None
+            # Prefer a sheet named exactly "Transactions"; else fall back to second, then first
+            for name in sheet_names:
+                if str(name).strip().lower() == "transactions":
+                    transactions_sheet = name
+                    break
+            if transactions_sheet is None:
+                transactions_sheet = sheet_names[1] if len(sheet_names) > 1 else sheet_names[0]
 
-            if not transactions_sheet:
-                raise ValueError("No suitable transactions sheet found")
-
-            # Get all data from the transactions sheet
-            sheet_data = self.open_sheet(sheet_id, transactions_sheet)
-            values = sheet_data.get("values", [])
-
+            values = self.open_sheet(sheet_id, transactions_sheet).get("values", [])
             if not values:
                 return [], []
 
-            # Parse the sheet data to extract expenses and income
-            expenses = []
-            income = []
+            def normalize_amount(raw: str) -> float:
+                s = str(raw)
+                # Remove currency and separators used commonly in IDR formats
+                cleaned = (
+                    s.replace("Rp", "").replace("rp", "").replace(" ", "").replace(",", "").replace(".", "").strip()
+                )
+                try:
+                    return float(cleaned) if cleaned else 0.0
+                except ValueError:
+                    return 0.0
 
-            # Find the headers and data sections
-            current_section = None
-            headers = None
+            # Locate the columns where sections begin
+            expenses_col = None
+            income_col = None
+            header_row_idx = None
 
             for i, row in enumerate(values):
-                if not row:
-                    continue
+                # Find a row that contains the words 'expenses' or 'income' anywhere
+                lowered = [str(c).strip().lower() for c in row]
+                for j, cell in enumerate(lowered):
+                    if cell == "expenses" and expenses_col is None:
+                        expenses_col = j
+                    if cell == "income" and income_col is None:
+                        income_col = j
+                if expenses_col is not None or income_col is not None:
+                    # Search a few rows below for the header labels near these columns
+                    for k in range(i, min(i + 5, len(values))):
+                        probe = [str(c).strip().lower() for c in values[k]]
+                        if expenses_col is not None and expenses_col < len(probe) and probe[expenses_col] == "date":
+                            header_row_idx = header_row_idx or k
+                        if income_col is not None and income_col < len(probe) and probe[income_col] == "date":
+                            header_row_idx = header_row_idx or k
+                    if header_row_idx is not None:
+                        break
 
-                # Check if this row contains "Expenses" or "Income" header
-                first_cell = str(row[0]).strip().lower() if row else ""
-
-                if "expenses" in first_cell:
-                    current_section = "expenses"
-                    # Next non-empty row should contain headers
-                    for j in range(i + 1, len(values)):
-                        if values[j] and any(values[j]):
-                            headers = [str(cell).strip().lower() for cell in values[j]]
-                            break
-                    continue
-                elif "income" in first_cell:
-                    current_section = "income"
-                    # Next non-empty row should contain headers
-                    for j in range(i + 1, len(values)):
-                        if values[j] and any(values[j]):
-                            headers = [str(cell).strip().lower() for cell in values[j]]
-                            break
-                    continue
-
-                # Skip if we don't have a current section or headers
-                if not current_section or not headers:
-                    continue
-
-                # Skip header rows
-                if any(header in str(row[0]).lower() for header in ["date", "amount", "description"]):
-                    continue
-
-                # Parse data rows
-                if len(row) >= 3 and current_section:  # At least date, amount, description
+            # If not found via titles, try to find two repeated blocks of headers in one row
+            if header_row_idx is None:
+                for i, row in enumerate(values):
+                    lowered = [str(c).strip().lower() for c in row]
+                    # Look for 'date, amount, description' sequence twice
                     try:
-                        # Map the row data to expected columns
-                        date_idx = next((i for i, h in enumerate(headers) if "date" in h), 0)
-                        amount_idx = next((i for i, h in enumerate(headers) if "amount" in h), 1)
-                        desc_idx = next((i for i, h in enumerate(headers) if "description" in h), 2)
-                        category_idx = next((i for i, h in enumerate(headers) if "category" in h), 3)
-
-                        date = row[date_idx] if date_idx < len(row) else ""
-                        amount = row[amount_idx] if amount_idx < len(row) else ""
-                        description = row[desc_idx] if desc_idx < len(row) else ""
-                        category = row[category_idx] if category_idx < len(row) else ""
-
-                        # Clean amount (remove currency symbols and convert to float)
-                        amount_str = str(amount).replace("Rp", "").replace(",", "").replace(".", "").strip()
-                        try:
-                            amount_value = float(amount_str) if amount_str else 0.0
-                        except ValueError:
-                            amount_value = 0.0
-
-                        if date and amount_value > 0:  # Only include rows with valid data
-                            record = {
-                                "date": str(date).strip(),
-                                "amount": amount_value,
-                                "description": str(description).strip(),
-                                "category": str(category).strip(),
-                                "type": current_section,
-                            }
-
-                            if current_section == "expenses":
-                                expenses.append(record)
-                            else:
-                                income.append(record)
-
-                    except (ValueError, IndexError):
-                        # Skip invalid rows
+                        first_date = lowered.index("date")
+                    except ValueError:
                         continue
+                    # Look ahead for the next 'date'
+                    try:
+                        second_date = lowered.index("date", first_date + 1)
+                    except ValueError:
+                        second_date = None
+                    expenses_col = expenses_col if expenses_col is not None else first_date
+                    income_col = income_col if income_col is not None else second_date
+                    header_row_idx = i
+                    break
+
+            if header_row_idx is None or (expenses_col is None and income_col is None):
+                return [], []
+
+            # Extract rows
+            expenses: list[dict] = []
+            income: list[dict] = []
+
+            start_row = header_row_idx + 1
+            for r in range(start_row, len(values)):
+                row = values[r]
+                # Expenses block
+                if expenses_col is not None and expenses_col < len(row):
+                    date = row[expenses_col] if expenses_col < len(row) else ""
+                    amount = row[expenses_col + 1] if expenses_col + 1 < len(row) else ""
+                    description = row[expenses_col + 2] if expenses_col + 2 < len(row) else ""
+                    category = row[expenses_col + 3] if expenses_col + 3 < len(row) else ""
+                    if any([date, amount, description, category]):
+                        amount_value = normalize_amount(amount)
+                        if amount_value > 0 and (date or description):
+                            expenses.append(
+                                {
+                                    "date": str(date).strip(),
+                                    "amount": amount_value,
+                                    "description": str(description).strip(),
+                                    "category": str(category).strip(),
+                                    "type": "expenses",
+                                }
+                            )
+
+                # Income block
+                if income_col is not None and income_col < len(row):
+                    date_i = row[income_col] if income_col < len(row) else ""
+                    amount_i = row[income_col + 1] if income_col + 1 < len(row) else ""
+                    description_i = row[income_col + 2] if income_col + 2 < len(row) else ""
+                    category_i = row[income_col + 3] if income_col + 3 < len(row) else ""
+                    if any([date_i, amount_i, description_i, category_i]):
+                        amount_value_i = normalize_amount(amount_i)
+                        if amount_value_i > 0 and (date_i or description_i):
+                            income.append(
+                                {
+                                    "date": str(date_i).strip(),
+                                    "amount": amount_value_i,
+                                    "description": str(description_i).strip(),
+                                    "category": str(category_i).strip(),
+                                    "type": "income",
+                                }
+                            )
 
             return expenses, income
 
