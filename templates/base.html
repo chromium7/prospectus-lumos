@@ -133,21 +133,29 @@
             <!-- Sidebar -->
             <div class="col-lg-2 col-md-3 sidebar p-3">
                 <nav class="nav flex-column">
-                    <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
+                    <a class="nav-link {% if selected_tab == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
                         <i class="bi bi-speedometer2 me-2"></i>
                         Dashboard
                     </a>
-                    <a class="nav-link {% if request.resolver_match.url_name == 'document_list' %}active{% endif %}" href="{% url 'document_list' %}">
+                    <a class="nav-link {% if selected_tab == 'documents' %}active{% endif %}" href="{% url 'document_list' %}">
                         <i class="bi bi-file-earmark-spreadsheet me-2"></i>
                         Documents
                     </a>
-                    <a class="nav-link {% if request.resolver_match.url_name == 'income_analyzer' %}active{% endif %}" href="{% url 'income_analyzer' %}">
+                    <a class="nav-link {% if selected_tab == 'income' %}active{% endif %}" href="{% url 'income_analyzer' %}">
                         <i class="bi bi-graph-up me-2"></i>
                         Income Analyzer
                     </a>
-                    <a class="nav-link {% if request.resolver_match.url_name == 'expense_analyzer' %}active{% endif %}" href="{% url 'expense_analyzer' %}">
+                    <a class="nav-link {% if selected_tab == 'expenses' %}active{% endif %}" href="{% url 'expense_analyzer' %}">
                         <i class="bi bi-graph-down me-2"></i>
                         Expense Analyzer
+                    </a>
+                    <a class="nav-link {% if selected_tab == 'google_credentials' %}active{% endif %}" href="{% url 'google_credentials' %}">
+                        <i class="bi bi-cloud-arrow-up me-2"></i>
+                        Google Credentials
+                    </a>
+                    <a class="nav-link {% if selected_tab == 'sources' %}active{% endif %}" href="{% url 'source_list' %}">
+                        <i class="bi bi-diagram-3 me-2"></i>
+                        Document Sources
                     </a>
                 </nav>
             </div>

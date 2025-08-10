@@ -66,6 +66,7 @@ def dashboard_view(request: TypedHttpRequest) -> HttpResponse:
         "total_income": total_income,
         "total_expenses": total_expenses,
         "net_income": net_income,
+        "selected_tab": "dashboard",
     }
 
     return render(request, "expenses/dashboard.html", context)
@@ -126,6 +127,7 @@ def document_list_view(request: TypedHttpRequest) -> HttpResponse:
         "month_filter": month_filter,
         "available_years": available_years,
         "available_months": available_months,
+        "selected_tab": "documents",
     }
 
     return render(request, "expenses/document_list.html", context)
@@ -173,6 +175,7 @@ def income_analyzer_view(request: TypedHttpRequest) -> HttpResponse:
         "available_years": available_years,
         "available_months": available_months,
         "filter_text": f"for {month_filter}/{year_filter}" if year_filter or month_filter else "for all periods",
+        "selected_tab": "income",
     }
 
     return render(request, "expenses/income_analyzer.html", context)
@@ -220,6 +223,7 @@ def expense_analyzer_view(request: TypedHttpRequest) -> HttpResponse:
         "available_years": available_years,
         "available_months": available_months,
         "filter_text": f"for {month_filter}/{year_filter}" if year_filter or month_filter else "for all periods",
+        "selected_tab": "expenses",
     }
 
     return render(request, "expenses/expense_analyzer.html", context)
