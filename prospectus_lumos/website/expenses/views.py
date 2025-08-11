@@ -11,6 +11,7 @@ from collections import Counter
 from prospectus_lumos.apps.accounts.models import DocumentSource
 from prospectus_lumos.apps.documents.models import Document
 from prospectus_lumos.apps.expenses.services import ExpenseSheetService, ExpenseAnalyzerService
+from prospectus_lumos.core.constants import MONTHS_LIST
 from prospectus_lumos.core.utils import TypedHttpRequest
 
 
@@ -102,20 +103,7 @@ def document_list_view(request: TypedHttpRequest) -> HttpResponse:
     available_years = (
         Document.objects.filter(user=request.user).values_list("year", flat=True).distinct().order_by("-year")
     )
-    available_months = [
-        (1, "January"),
-        (2, "February"),
-        (3, "March"),
-        (4, "April"),
-        (5, "May"),
-        (6, "June"),
-        (7, "July"),
-        (8, "August"),
-        (9, "September"),
-        (10, "October"),
-        (11, "November"),
-        (12, "December"),
-    ]
+    available_months = MONTHS_LIST
 
     # Pagination
     paginator = Paginator(documents, 10)
@@ -155,20 +143,7 @@ def income_analyzer_view(request: TypedHttpRequest) -> HttpResponse:
     available_years = (
         Document.objects.filter(user=request.user).values_list("year", flat=True).distinct().order_by("-year")
     )
-    available_months = [
-        (1, "January"),
-        (2, "February"),
-        (3, "March"),
-        (4, "April"),
-        (5, "May"),
-        (6, "June"),
-        (7, "July"),
-        (8, "August"),
-        (9, "September"),
-        (10, "October"),
-        (11, "November"),
-        (12, "December"),
-    ]
+    available_months = MONTHS_LIST
 
     context = {
         "analysis": analysis,
@@ -203,20 +178,7 @@ def expense_analyzer_view(request: TypedHttpRequest) -> HttpResponse:
     available_years = (
         Document.objects.filter(user=request.user).values_list("year", flat=True).distinct().order_by("-year")
     )
-    available_months = [
-        (1, "January"),
-        (2, "February"),
-        (3, "March"),
-        (4, "April"),
-        (5, "May"),
-        (6, "June"),
-        (7, "July"),
-        (8, "August"),
-        (9, "September"),
-        (10, "October"),
-        (11, "November"),
-        (12, "December"),
-    ]
+    available_months = MONTHS_LIST
 
     context = {
         "analysis": analysis,
@@ -358,20 +320,7 @@ def category_analyzer_view(request: TypedHttpRequest) -> HttpResponse:
     available_years = (
         Document.objects.filter(user=request.user).values_list("year", flat=True).distinct().order_by("-year")
     )
-    available_months = [
-        (1, "January"),
-        (2, "February"),
-        (3, "March"),
-        (4, "April"),
-        (5, "May"),
-        (6, "June"),
-        (7, "July"),
-        (8, "August"),
-        (9, "September"),
-        (10, "October"),
-        (11, "November"),
-        (12, "December"),
-    ]
+    available_months = MONTHS_LIST
 
     context = {
         "category_type": category_type,
