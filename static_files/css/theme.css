@@ -1,0 +1,208 @@
+:root {
+  --primary-color: #4f46e5;
+  --secondary-color: #6b7280;
+  --success-color: #10b981;
+  --danger-color: #ef4444;
+  --warning-color: #f59e0b;
+  --bg-color: #ffffff;
+  --text-color: #111827;
+  --muted-text: #6b7280;
+  --card-bg: #ffffff;
+  --sidebar-bg: #f8fafc;
+  --footer-bg: #f8fafc;
+  --border-color: #e5e7eb;
+}
+
+body {
+  background: var(--bg-color);
+  color: var(--text-color);
+}
+
+
+.navbar-brand {
+  font-weight: 700;
+  color: var(--primary-color) !important;
+}
+
+.btn-primary {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.btn-primary:hover {
+  background-color: #3730a3;
+  border-color: #3730a3;
+}
+
+.text-primary {
+  color: var(--primary-color) !important;
+}
+
+.stat-card {
+  border-left: 4px solid var(--primary-color);
+}
+
+.stat-card.income {
+  border-left-color: var(--success-color);
+}
+
+.stat-card.expense {
+  border-left-color: var(--danger-color);
+}
+
+.stat-card.net {
+  border-left-color: var(--warning-color);
+}
+
+.card {
+  border: none;
+  background: var(--card-bg);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+}
+
+.card:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.sidebar {
+  min-height: calc(100vh - 76px);
+  background-color: var(--sidebar-bg);
+  border-right: 1px solid var(--border-color);
+}
+
+.sidebar .nav-link {
+  color: var(--secondary-color);
+  padding: 0.75rem 1rem;
+  border-radius: 0.375rem;
+  margin-bottom: 0.25rem;
+}
+
+.sidebar .nav-link:hover {
+  background-color: #e5e7eb;
+  color: var(--primary-color);
+}
+
+.sidebar .nav-link.active {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.footer {
+  background-color: var(--footer-bg);
+  border-top: 1px solid var(--border-color);
+  margin-top: 3rem;
+}
+
+/* Dark mode */
+.dark {
+  --bg-color: #0b1220;
+  --text-color: #e5e7eb;
+  --muted-text: #9aa9c2;
+  --card-bg: #0f172a;
+  --sidebar-bg: #0b1220;
+  --footer-bg: #0b1220;
+  --border-color: #1f2937;
+  color-scheme: dark;
+}
+
+/* Form controls */
+.dark input,
+.dark select,
+.dark textarea,
+.dark .form-control,
+.dark .form-select,
+.dark .form-check-input {
+  background-color: var(--card-bg);
+  color: var(--text-color);
+  border-color: var(--border-color);
+}
+
+.dark .navbar,
+.dark .sidebar,
+.dark .footer {
+  background-color: var(--sidebar-bg) !important;
+  border-color: var(--border-color);
+}
+
+.dark .nav-link,
+.dark .text-muted,
+.dark small,
+.dark .card-subtitle {
+  color: var(--muted-text) !important;
+}
+
+/* Sidebar interactions in dark mode */
+.dark .sidebar .nav-link:hover {
+  background-color: #111827;
+  color: var(--text-color) !important;
+}
+
+.dark .sidebar .nav-link.active {
+  background-color: #1e293b;
+  color: var(--text-color) !important;
+}
+
+.dark .table,
+.dark .table-hover tbody tr:hover {
+  color: var(--text-color);
+}
+
+/* Table theming in dark mode */
+.dark .table {
+  --bs-table-color: var(--text-color);
+  --bs-table-bg: #0f172a;
+  /* matches card bg */
+  --bs-table-border-color: var(--border-color);
+  --bs-table-striped-bg: #0b1220;
+  --bs-table-hover-bg: #1e293b;
+  /* higher contrast for readability */
+}
+
+.dark .table> :not(caption)>*>* {
+  background-color: var(--bs-table-bg) !important;
+  border-color: var(--bs-table-border-color) !important;
+  color: var(--bs-table-color);
+}
+
+.dark .table-hover>tbody>tr:hover>* {
+  background-color: var(--bs-table-hover-bg) !important;
+}
+
+.dark .table-hover>tbody>tr:hover {
+  color: var(--bs-table-color) !important;
+}
+
+.dark .table-striped>tbody>tr:nth-of-type(odd)>* {
+  background-color: var(--bs-table-striped-bg) !important;
+}
+
+.dark .table thead th {
+  color: var(--text-color);
+  border-bottom-color: var(--border-color);
+}
+
+.dark .btn-outline-primary,
+.dark .btn-outline-secondary,
+.dark .btn-outline-success,
+.dark .btn-outline-danger {
+  color: var(--text-color);
+  border-color: var(--border-color);
+}
+
+.dark .btn-outline-primary:hover,
+.dark .btn-outline-secondary:hover,
+.dark .btn-outline-success:hover,
+.dark .btn-outline-danger:hover {
+  background: #1f2937;
+}
+
+/* Utilities for legibility */
+.card-header,
+.card-body,
+.card-footer {
+  color: var(--text-color);
+}
+
+.text-muted {
+  color: var(--muted-text) !important;
+}
