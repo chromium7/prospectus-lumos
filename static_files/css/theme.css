@@ -102,6 +102,19 @@ body {
   --sidebar-bg: #0b1220;
   --footer-bg: #0b1220;
   --border-color: #1f2937;
+  color-scheme: dark;
+}
+
+/* Form controls */
+.dark input,
+.dark select,
+.dark textarea,
+.dark .form-control,
+.dark .form-select,
+.dark .form-check-input {
+  background-color: var(--card-bg);
+  color: var(--text-color);
+  border-color: var(--border-color);
 }
 
 .dark .navbar,

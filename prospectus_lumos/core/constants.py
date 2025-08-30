@@ -18,17 +18,4 @@ class Months(IntegerChoices):
     DECEMBER = 12, "December"
 
 
-MONTHS_LIST = [
-    (Months.JANUARY, "January"),
-    (Months.FEBRUARY, "February"),
-    (Months.MARCH, "March"),
-    (Months.APRIL, "April"),
-    (Months.MAY, "May"),
-    (Months.JUNE, "June"),
-    (Months.JULY, "July"),
-    (Months.AUGUST, "August"),
-    (Months.SEPTEMBER, "September"),
-    (Months.OCTOBER, "October"),
-    (Months.NOVEMBER, "November"),
-    (Months.DECEMBER, "December"),
-]
+MONTHS_LIST: list[tuple[int, str]] = list(Months.choices)
