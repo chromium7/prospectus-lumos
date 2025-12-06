@@ -8,6 +8,7 @@ urlpatterns = [
     # Main pages
     path("", views.dashboard_view, name="dashboard"),
     path("documents/", views.document_list_view, name="document_list"),
+    path("documents/<int:document_id>/", views.document_detail_view, name="document_detail"),
     path("income-analyzer/", views.income_analyzer_view, name="income_analyzer"),
     path("expense-analyzer/", views.expense_analyzer_view, name="expense_analyzer"),
     path("category-analyzer/", views.category_analyzer_view, name="category_analyzer"),

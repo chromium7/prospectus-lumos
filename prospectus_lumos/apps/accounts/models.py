@@ -51,13 +51,12 @@ class GoogleDriveCredentials(models.Model):
 class DocumentSource(models.Model):
     """Track different sources of documents"""
 
-    SOURCE_TYPES = [
-        ("google_drive", "Google Drive"),
-        ("direct_upload", "Direct Upload"),
-    ]
+    class SourceType(models.TextChoices):
+        GOOGLE_DRIVE = "google_drive", "Google Drive"
+        DIRECT_UPLOAD = "direct_upload", "Direct Upload"
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="document_sources")
-    source_type = models.CharField(max_length=20, choices=SOURCE_TYPES)
+    source_type = models.CharField(max_length=20, choices=SourceType.choices)
     name = models.CharField(max_length=255, help_text="Friendly name for this source")
     google_credentials = models.ForeignKey(
         GoogleDriveCredentials,

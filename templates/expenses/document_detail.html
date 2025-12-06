@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+{% load formatting %}
+
+{% block title %}{{ document.month_name }} {{ document.year }} - Document Details{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="mb-1">Document Details</h1>
+        <small class="text-muted">
+            {{ document.month_name }} {{ document.year }} &middot;
+            {{ document.source.get_source_type_display }} &mdash;
+            {{ document.google_sheet_name|default:"Manual Upload" }}
+        </small>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'document_list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Documents
+        </a>
+        <a href="{% url 'download_csv' document.id %}" class="btn btn-outline-primary">
+            <i class="bi bi-download"></i> Download CSV
+        </a>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-4 mb-3">
+        <div class="card stat-card income">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Total Income</h6>
+                <h3 class="mb-0 text-success">{{ document.total_income|idr }}</h3>
+                <small class="text-muted d-block mt-1">
+                    {{ document.income_count }} income transactions
+                </small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card stat-card expense">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Total Expenses</h6>
+                <h3 class="mb-0 text-danger">{{ document.total_expenses|idr }}</h3>
+                <small class="text-muted d-block mt-1">
+                    {{ document.expenses_count }} expense transactions
+                </small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card stat-card net">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Net Income</h6>
+                <h3 class="mb-0 {% if document.net_income >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {{ document.net_income|idr }}
+                </h3>
+                <small class="text-muted d-block mt-1">
+                    Income minus expenses for this month
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Transactions Table -->
+<div class="card">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="mb-0">Transactions for {{ document.month_name }} {{ document.year }}</h5>
+            <small class="text-muted">
+                {% if current_sort == 'amount' %}
+                    Sorted by amount ({{ current_direction|default:'asc' }})
+                {% else %}
+                    Sorted by transaction date from the original sheet
+                {% endif %}
+            </small>
+        </div>
+        <form method="get" class="row g-3">
+            {{ filter_form.sort }}
+            {{ filter_form.direction }}
+            <div class="col-md-4 col-lg-3">
+                <label class="form-label mb-1">{{ filter_form.transaction_type.label }}</label>
+                {{ filter_form.transaction_type }}
+            </div>
+            <div class="col-md-3 col-lg-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="bi bi-funnel"></i> Apply
+                </button>
+                <a href="{% url 'document_detail' document.id %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-circle"></i> Clear
+                </a>
+            </div>
+        </form>
+    </div>
+    <div class="card-body">
+        {% if transactions %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width: 12%">Date</th>
+                            <th style="width: 12%">Type</th>
+                            <th>Description</th>
+                            <th style="width: 18%">Category</th>
+                            <th class="text-end" style="width: 16%">
+                                <a href="{% url 'document_detail' document.id %}?sort=amount&direction={% if current_sort == 'amount' and current_direction == 'asc' %}desc{% else %}asc{% endif %}{% if current_type %}&transaction_type={{ current_type }}{% endif %}"
+                                   class="text-decoration-none">
+                                    Amount
+                                    {% if current_sort == 'amount' %}
+                                        <i class="bi bi-caret-{% if current_direction == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tx in transactions %}
+                        <tr>
+                            <td>{{ tx.date }}</td>
+                            <td>
+                                <span class="badge {% if tx.transaction_type == 'income' %}bg-success{% else %}bg-danger{% endif %}">
+                                    {{ tx.get_transaction_type_display }}
+                                </span>
+                            </td>
+                            <td>{{ tx.description }}</td>
+                            <td>
+                                {% if tx.category %}
+                                    {{ tx.category }}
+                                {% else %}
+                                    <span class="text-muted">Uncategorized</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end {% if tx.transaction_type == 'income' %}text-success{% else %}text-danger{% endif %}">
+                                {{ tx.amount|idr }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-4">
+                <i class="bi bi-receipt-cutoff text-muted" style="font-size: 3rem;"></i>
+                <h5 class="mt-3 text-muted">No Transactions Found</h5>
+                <p class="text-muted mb-0">
+                    This document does not contain any transactions yet.
+                </p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

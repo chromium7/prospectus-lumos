@@ -74,7 +74,9 @@
                         {% for doc in page_obj %}
                         <tr>
                             <td>
-                                <strong>{{ doc.month_name }} {{ doc.year }}</strong>
+                                <a href="{% url 'document_detail' doc.id %}" class="text-decoration-none">
+                                    <strong>{{ doc.month_name }} {{ doc.year }}</strong>
+                                </a>
                             </td>
                             <td>
                                 {% if doc.google_sheet_name %}

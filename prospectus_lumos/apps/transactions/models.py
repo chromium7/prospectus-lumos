@@ -6,13 +6,12 @@ from django.db import models
 class Transaction(models.Model):
     """Individual transaction records extracted from CSV files"""
 
-    TRANSACTION_TYPES = [
-        ("expense", "Expense"),
-        ("income", "Income"),
-    ]
+    class TransactionType(models.TextChoices):
+        EXPENSE = "expense", "Expense"
+        INCOME = "income", "Income"
 
     document = models.ForeignKey("documents.Document", on_delete=models.CASCADE, related_name="transactions")
-    transaction_type = models.CharField(max_length=10, choices=TRANSACTION_TYPES)
+    transaction_type = models.CharField(max_length=10, choices=TransactionType.choices)
     date = models.CharField(max_length=50, help_text="Date as string from original sheet")
     amount = models.DecimalField(max_digits=15, decimal_places=2)
     description = models.CharField(max_length=500)

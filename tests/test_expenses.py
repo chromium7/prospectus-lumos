@@ -115,6 +115,57 @@ class ExpenseSheetServiceSyncTests(TestCase):
         self.assertEqual(existing.google_sheet_id, "SAME")
 
 
+class DocumentDetailViewTests(TestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(username="tester", password="pass")
+
+        self.source = DocumentSource.objects.create(
+            user=self.user,
+            source_type="google_drive",
+            name="Main Drive",
+            is_active=True,
+        )
+
+        self.document = Document.objects.create(
+            user=self.user,
+            source=self.source,
+            month=8,
+            year=2025,
+        )
+
+        # Create a couple of transactions with out-of-order dates to verify ordering
+        Transaction.objects.create(
+            document=self.document,
+            transaction_type="expense",
+            date="2025-08-15",
+            amount=10000,
+            description="Groceries",
+            category="Food",
+        )
+        Transaction.objects.create(
+            document=self.document,
+            transaction_type="income",
+            date="2025-08-01",
+            amount=500000,
+            description="Salary",
+            category="Income",
+        )
+
+    def test_document_detail_view_shows_transactions_sorted_by_date(self) -> None:
+        self.client.login(username="tester", password="pass")
+        url = reverse("document_detail", args=[self.document.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "expenses/document_detail.html")
+
+        transactions = list(response.context["transactions"])
+        self.assertEqual(len(transactions), 2)
+        # Ensure ordered by date then id (oldest first)
+        self.assertEqual(transactions[0].date, "2025-08-01")
+        self.assertEqual(transactions[1].date, "2025-08-15")
+
+
 class SyncDocumentsViewTests(TestCase):
     def setUp(self) -> None:
         self.user = User.objects.create_user(username="tester", password="pass")

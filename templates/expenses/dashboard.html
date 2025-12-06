@@ -118,7 +118,9 @@
                                 {% for doc in recent_documents %}
                                 <tr>
                                     <td>
-                                        <strong>{{ doc.month_name }} {{ doc.year }}</strong>
+                                        <a href="{% url 'document_detail' doc.id %}" class="text-decoration-none">
+                                            <strong>{{ doc.month_name }} {{ doc.year }}</strong>
+                                        </a>
                                     </td>
                                     <td>{{ doc.google_sheet_name|default:"Manual Upload" }}</td>
                                     <td class="text-end text-success">{{ doc.total_income|idr }}</td>
@@ -127,7 +129,7 @@
                                         {{ doc.net_income|idr }}
                                     </td>
                                     <td class="text-end">
-                                        <a href="{% url 'download_csv' doc.id %}" class="btn btn-sm btn-outline-secondary">
+                                        <a href="{% url 'download_csv' doc.id %}" class="btn btn-sm btn-outline-secondary" title="Download CSV">
                                             <i class="bi bi-download"></i>
                                         </a>
                                     </td>
