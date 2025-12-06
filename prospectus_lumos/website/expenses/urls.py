@@ -11,6 +11,7 @@ urlpatterns = [
     path("documents/<int:document_id>/", views.document_detail_view, name="document_detail"),
     path("income-analyzer/", views.income_analyzer_view, name="income_analyzer"),
     path("expense-analyzer/", views.expense_analyzer_view, name="expense_analyzer"),
+    path("portfolio-analyzer/", views.portfolio_analyzer_view, name="portfolio_analyzer"),
     path("category-analyzer/", views.category_analyzer_view, name="category_analyzer"),
     # Actions
     path("sync-documents/", views.sync_documents_view, name="sync_documents"),

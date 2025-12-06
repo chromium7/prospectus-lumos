@@ -7,6 +7,7 @@ from django.views.decorators.http import require_http_methods
 from django.core.paginator import Paginator
 from django.db.models import Q
 from collections import Counter
+from django.utils import timezone
 
 from prospectus_lumos.apps.accounts.models import DocumentSource
 from prospectus_lumos.apps.documents.models import Document
@@ -223,6 +224,58 @@ def expense_analyzer_view(request: TypedHttpRequest) -> HttpResponse:
     }
 
     return render(request, "expenses/expense_analyzer.html", context)
+
+
+@login_required
+def portfolio_analyzer_view(request: TypedHttpRequest) -> HttpResponse:
+    """Portfolio analyzer combining income and expenses to focus on savings trends."""
+    analyzer = ExpenseAnalyzerService(request.user)
+
+    # Get filter parameters (range of years instead of year/month)
+    year_from_str = request.GET.get("year_from", "")
+    year_to_str = request.GET.get("year_to", "")
+
+    # Default: previous 2 years based on current year, to avoid querying full history
+    if not year_from_str and not year_to_str:
+        current_year = timezone.now().year
+        year_from = current_year - 1
+        year_to = current_year
+        year_from_str = str(year_from)
+        year_to_str = str(year_to)
+    else:
+        year_from = int(year_from_str) if year_from_str else None
+        year_to = int(year_to_str) if year_to_str else None
+
+    # Normalize if user inverted the range
+    if year_from is not None and year_to is not None and year_from > year_to:
+        year_from, year_to = year_to, year_from
+        year_from_str, year_to_str = str(year_from), str(year_to)
+
+    analysis = analyzer.get_portfolio_analysis(start_year=year_from, end_year=year_to)
+
+    available_years = (
+        Document.objects.filter(user=request.user).values_list("year", flat=True).distinct().order_by("-year")
+    )
+
+    if year_from_str and year_to_str:
+        filter_text = f"from {year_from_str} to {year_to_str}"
+    elif year_from_str:
+        filter_text = f"from {year_from_str}"
+    elif year_to_str:
+        filter_text = f"up to {year_to_str}"
+    else:
+        filter_text = "for the last 2 years"
+
+    context = {
+        "analysis": analysis,
+        "year_from": year_from_str,
+        "year_to": year_to_str,
+        "available_years": available_years,
+        "filter_text": filter_text,
+        "selected_tab": "portfolio",
+    }
+
+    return render(request, "expenses/portfolio_analyzer.html", context)
 
 
 @login_required

@@ -1,0 +1,514 @@
+{% extends 'base.html' %}
+{% load formatting %}
+
+{% block title %}Portfolio Analyzer - Prospectus Lumos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="mb-0">Portfolio Analyzer</h1>
+        <small class="text-muted">See how income, expenses, and savings work together over time.</small>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <label for="year_from" class="form-label">From year</label>
+                <select class="form-select" id="year_from" name="year_from">
+                    <option value="">Any</option>
+                    {% for year in available_years %}
+                        <option value="{{ year }}" {% if year_from == year|stringformat:"s" %}selected{% endif %}>
+                            {{ year }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="year_to" class="form-label">To year</label>
+                <select class="form-select" id="year_to" name="year_to">
+                    <option value="">Any</option>
+                    {% for year in available_years %}
+                        <option value="{{ year }}" {% if year_to == year|stringformat:"s" %}selected{% endif %}>
+                            {{ year }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="bi bi-funnel"></i> Apply Filter
+                </button>
+                <a href="{% url 'portfolio_analyzer' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-circle"></i> Clear
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Summary Statistics -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card stat-card income">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-subtitle mb-2 text-muted">Total Income {{ filter_text }}</h6>
+                        <h3 class="mb-0 text-success">{{ analysis.total_income|idr }}</h3>
+                    </div>
+                    <div class="text-success">
+                        <i class="bi bi-cash-stack" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-3">
+        <div class="card stat-card expense">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-subtitle mb-2 text-muted">Total Expenses {{ filter_text }}</h6>
+                        <h3 class="mb-0 text-danger">{{ analysis.total_expenses|idr }}</h3>
+                    </div>
+                    <div class="text-danger">
+                        <i class="bi bi-credit-card" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-3">
+        <div class="card stat-card net">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-subtitle mb-2 text-muted">Net Savings {{ filter_text }}</h6>
+                        <h3 class="mb-0 {% if analysis.net_income >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {{ analysis.net_income|idr }}
+                        </h3>
+                    </div>
+                    <div class="{% if analysis.net_income >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        <i class="bi bi-piggy-bank" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-3">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-subtitle mb-2 text-muted">Average Monthly Savings</h6>
+                        <h3 class="mb-0 {% if analysis.average_net_income >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {{ analysis.average_net_income|idr }}
+                        </h3>
+                    </div>
+                    <div class="text-primary">
+                        <i class="bi bi-calendar3" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Savings Quality & Composition -->
+<div class="row mb-4">
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Savings Rate (overall)</h6>
+                <h3 class="mb-0 {% if analysis.overall_savings_rate >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {{ analysis.overall_savings_rate|floatformat:1 }}%
+                </h3>
+                <small class="text-muted">Out of every Rp 100 you earn, this is how much you keep.</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Typical Savings Month</h6>
+                <h3 class="mb-0 {% if analysis.average_savings_rate >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {{ analysis.average_savings_rate|floatformat:1 }}%
+                </h3>
+                <small class="text-muted">Average savings rate across all months in this view.</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Timeline & Best/Worst Months -->
+<div class="row mb-4">
+    <div class="col-lg-8 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Income vs Expenses Trend</h5>
+            </div>
+            <div class="card-body">
+                {% if analysis.monthly_series %}
+                    <div class="p-3 border rounded" style="max-width: 880px; margin: 0 auto;">
+                        <canvas id="portfolioTrendChart"></canvas>
+                    </div>
+                    <small class="text-muted d-block mt-2">
+                        Tip: Look for months where the green area (income) consistently stays above the red area (expenses).
+                    </small>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-graph-up-arrow text-muted" style="font-size: 3rem;"></i>
+                        <p class="mt-3 text-muted">No documents found for the selected period</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0">Savings Rate Trend</h5>
+            </div>
+            <div class="card-body">
+                {% if analysis.monthly_series %}
+                    <div class="p-3 border rounded" style="max-width: 880px; margin: 0 auto;">
+                        <canvas id="portfolioSavingsRateChart"></canvas>
+                    </div>
+                    <small class="text-muted d-block mt-2">
+                        See how your savings rate (percentage of income kept) evolves month by month.
+                    </small>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-graph-up-arrow text-muted" style="font-size: 3rem;"></i>
+                        <p class="mt-3 text-muted">No documents found for the selected period</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4 mb-4">
+        <div class="card mb-3">
+            <div class="card-header">
+                <h6 class="mb-0">Best Month</h6>
+            </div>
+            <div class="card-body">
+                {% if analysis.best_month %}
+                    <h5 class="mb-1">
+                        {{ analysis.best_month.month_name }} {{ analysis.best_month.year }}
+                    </h5>
+                    <p class="mb-1">
+                        <span class="text-success fw-bold">{{ analysis.best_month.net|idr }}</span> saved
+                    </p>
+                    <small class="text-muted d-block mb-1">
+                        Income {{ analysis.best_month.income|idr }} • Expenses {{ analysis.best_month.expenses|idr }}
+                    </small>
+                    <small class="text-muted">
+                        Savings rate: {{ analysis.best_month.savings_rate|floatformat:1 }}%
+                    </small>
+                {% else %}
+                    <p class="text-muted mb-0">No savings data yet.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">
+                <h6 class="mb-0">Most Challenging Month</h6>
+            </div>
+            <div class="card-body">
+                {% if analysis.worst_month %}
+                    <h5 class="mb-1">
+                        {{ analysis.worst_month.month_name }} {{ analysis.worst_month.year }}
+                    </h5>
+                    <p class="mb-1">
+                        <span class="{% if analysis.worst_month.net >= 0 %}text-success{% else %}text-danger{% endif %} fw-bold">
+                            {{ analysis.worst_month.net|idr }}
+                        </span>
+                        net
+                    </p>
+                    <small class="text-muted d-block mb-1">
+                        Income {{ analysis.worst_month.income|idr }} • Expenses {{ analysis.worst_month.expenses|idr }}
+                    </small>
+                    <small class="text-muted">
+                        Savings rate: {{ analysis.worst_month.savings_rate|floatformat:1 }}%
+                    </small>
+                {% else %}
+                    <p class="text-muted mb-0">No savings data yet.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">Savings Consistency</h6>
+            </div>
+            <div class="card-body">
+                <p class="mb-1">
+                    <strong>{{ analysis.positive_months }}</strong> months with positive savings,
+                    <strong>{{ analysis.negative_months }}</strong> months where expenses beat income,
+                    <strong>{{ analysis.zero_months }}</strong> break-even months.
+                </p>
+                <p class="mb-1">
+                    Longest positive savings streak:
+                    <strong>{{ analysis.longest_positive_streak }}</strong> month{{ analysis.longest_positive_streak|pluralize }}.
+                </p>
+                <small class="text-muted">
+                    Volatility (avg. month‑to‑month change in net): {{ analysis.volatility|idr }}.
+                </small>
+            </div>
+        </div>
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0">Cash Flow Mix</h6>
+            </div>
+            <div class="card-body">
+                <p class="mb-1">
+                    <span class="badge bg-success">Income {{ analysis.income_share|floatformat:1 }}%</span>
+                    <span class="badge bg-danger ms-2">Expenses {{ analysis.expense_share|floatformat:1 }}%</span>
+                </p>
+                <small class="text-muted d-block mb-2">
+                    How much of your total cash flow goes to expenses vs stays with you.
+                </small>
+                <div class="p-2 border rounded" style="max-width: 260px; margin: 0 auto;">
+                    <canvas id="portfolioCashFlowChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Monthly Table -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Monthly Portfolio Overview</h5>
+    </div>
+    <div class="card-body">
+        {% if analysis.monthly_series %}
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th>Month/Year</th>
+                            <th class="text-end">Income</th>
+                            <th class="text-end">Expenses</th>
+                            <th class="text-end">Net</th>
+                            <th class="text-end">Savings Rate</th>
+                            <th class="text-end">Entries</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in analysis.monthly_series reversed %}
+                        <tr>
+                            <td>{{ m.month_name }} {{ m.year }}</td>
+                            <td class="text-end text-success">{{ m.income|idr }}</td>
+                            <td class="text-end text-danger">{{ m.expenses|idr }}</td>
+                            <td class="text-end {% if m.net >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                <strong>{{ m.net|idr }}</strong>
+                            </td>
+                            <td class="text-end">
+                                {{ m.savings_rate|floatformat:1 }}%
+                            </td>
+                            <td class="text-end">
+                                <span class="badge bg-success">{{ m.income_count }}</span>
+                                <span class="badge bg-danger ms-1">{{ m.expenses_count }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-4">
+                <i class="bi bi-calendar-x text-muted" style="font-size: 3rem;"></i>
+                <p class="mt-3 text-muted">No documents found for the selected period</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+{% block extra_js %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{% if analysis.monthly_series %}
+<script>
+  (function() {
+    var labels = [
+      {% for m in analysis.monthly_series %}
+        "{{ m.month_name }} {{ m.year }}"{% if not forloop.last %},{% endif %}
+      {% endfor %}
+    ];
+    var incomeValues = [
+      {% for m in analysis.monthly_series %}
+        {{ m.income }}{% if not forloop.last %},{% endif %}
+      {% endfor %}
+    ];
+    var expenseValues = [
+      {% for m in analysis.monthly_series %}
+        {{ m.expenses }}{% if not forloop.last %},{% endif %}
+      {% endfor %}
+    ];
+    var netValues = [
+      {% for m in analysis.monthly_series %}
+        {{ m.net }}{% if not forloop.last %},{% endif %}
+      {% endfor %}
+    ];
+    var savingsRateValues = [
+      {% for m in analysis.monthly_series %}
+        {{ m.savings_rate }}{% if not forloop.last %},{% endif %}
+      {% endfor %}
+    ];
+
+    var trendCanvas = document.getElementById('portfolioTrendChart');
+    if (trendCanvas) {
+      new Chart(trendCanvas, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Income',
+            data: incomeValues,
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16,185,129,0.15)',
+            tension: 0.25,
+            fill: true,
+            pointRadius: 2
+          },
+          {
+            label: 'Expenses',
+            data: expenseValues,
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239,68,68,0.12)',
+            tension: 0.25,
+            fill: true,
+            pointRadius: 2
+          },
+          {
+            label: 'Net',
+            data: netValues,
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59,130,246,0.0)',
+            tension: 0.25,
+            fill: false,
+            borderDash: [4, 4],
+            pointRadius: 2
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        aspectRatio: 2.0,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                var label = context.dataset.label || '';
+                if (label) label += ': ';
+                var value = context.parsed.y || 0;
+                return label + 'Rp' + new Intl.NumberFormat('id-ID').format(value);
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            ticks: {
+              callback: function(v) {
+                return 'Rp' + new Intl.NumberFormat('id-ID').format(v);
+              }
+            }
+          }
+        }
+      }
+      });
+    }
+
+    var rateCanvas = document.getElementById('portfolioSavingsRateChart');
+    if (rateCanvas) {
+      new Chart(rateCanvas, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Savings rate (%)',
+              data: savingsRateValues,
+              borderColor: '#f59e0b',
+              backgroundColor: 'rgba(245,158,11,0.15)',
+              tension: 0.25,
+              fill: true,
+              pointRadius: 2
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          aspectRatio: 2.0,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  var value = context.parsed.y || 0;
+                  return 'Savings rate: ' + value.toFixed(1) + '%';
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              ticks: {
+                callback: function(v) {
+                  return v.toFixed(0) + '%';
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    var mixCanvas = document.getElementById('portfolioCashFlowChart');
+    if (mixCanvas) {
+      new Chart(mixCanvas, {
+        type: 'doughnut',
+        data: {
+          labels: ['Income', 'Expenses'],
+          datasets: [{
+            data: [{{ analysis.income_share|default:"0" }}, {{ analysis.expense_share|default:"0" }}],
+            backgroundColor: ['#10b981', '#ef4444']
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            legend: { position: 'bottom' },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  var label = context.label || '';
+                  var value = context.parsed || 0;
+                  return label + ': ' + value.toFixed(1) + '%';
+                }
+              }
+            }
+          },
+          cutout: '60%'
+        }
+      });
+    }
+  })();
+</script>
+{% endif %}
+{% endblock %}
+{% endblock %}

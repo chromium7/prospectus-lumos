@@ -62,6 +62,10 @@
                         <i class="bi bi-file-earmark-spreadsheet me-2"></i>
                         Documents
                     </a>
+                    <a class="nav-link {% if selected_tab == 'portfolio' %}active{% endif %}" href="{% url 'portfolio_analyzer' %}">
+                        <i class="bi bi-pie-chart me-2"></i>
+                        Portfolio Analyzer
+                    </a>
                     <a class="nav-link {% if selected_tab == 'income' %}active{% endif %}" href="{% url 'income_analyzer' %}">
                         <i class="bi bi-graph-up me-2"></i>
                         Income Analyzer

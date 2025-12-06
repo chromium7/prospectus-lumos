@@ -336,3 +336,124 @@ class ExpenseAnalyzerService:
             "expenses_by_category": expenses_by_category,
             "documents": documents.order_by("-year", "-month"),
         }
+
+    def get_portfolio_analysis(self, start_year: int | None = None, end_year: int | None = None) -> Dict[str, Any]:
+        """Combined income + expense view with savings-focused statistics over a year range."""
+        documents = Document.objects.filter(user=self.user)
+
+        if start_year is not None:
+            documents = documents.filter(year__gte=start_year)
+        if end_year is not None:
+            documents = documents.filter(year__lte=end_year)
+
+        documents = documents.order_by("year", "month")
+
+        document_count: int = documents.count()
+
+        # Build month-by-month portfolio timeline and aggregate statistics in a single pass
+        monthly_series: list[dict[str, Any]] = []
+        positive_months = 0
+        negative_months = 0
+        zero_months = 0
+        best_month: dict[str, Any] | None = None
+        worst_month: dict[str, Any] | None = None
+        savings_rates: list[Decimal] = []
+
+        total_income: Decimal = Decimal("0")
+        total_expenses: Decimal = Decimal("0")
+
+        # Streaks of positive savings (net > 0)
+        current_positive_streak = 0
+        longest_positive_streak = 0
+
+        for doc in documents:
+            income = doc.total_income
+            expenses = doc.total_expenses
+            net = income - expenses
+            # Store savings rate as a percentage (0-100) for easier display
+            savings_rate = (net / income * 100) if income > 0 else Decimal("0")
+
+            total_income += income
+            total_expenses += expenses
+
+            # Track counts
+            if net > 0:
+                positive_months += 1
+                current_positive_streak += 1
+                longest_positive_streak = max(longest_positive_streak, current_positive_streak)
+            elif net < 0:
+                negative_months += 1
+                current_positive_streak = 0
+            else:
+                zero_months += 1
+                current_positive_streak = 0
+
+            savings_rates.append(savings_rate)
+
+            entry = {
+                "year": doc.year,
+                "month": doc.month,
+                "month_name": doc.month_name,
+                "income": income,
+                "expenses": expenses,
+                "net": net,
+                "savings_rate": savings_rate,
+                "income_count": doc.income_count,
+                "expenses_count": doc.expenses_count,
+            }
+            monthly_series.append(entry)
+
+            if best_month is None or net > best_month["net"]:
+                best_month = entry
+            if worst_month is None or net < worst_month["net"]:
+                worst_month = entry
+
+        net_income: Decimal = total_income - total_expenses
+
+        average_income: Decimal | int = total_income / document_count if document_count > 0 else 0
+        average_expenses: Decimal | int = total_expenses / document_count if document_count > 0 else 0
+        average_net_income: Decimal | int = net_income / document_count if document_count > 0 else 0
+
+        # Aggregate savings-rate statistics
+        overall_savings_rate: Decimal | int = (net_income / total_income * 100) if total_income > 0 else 0
+        average_savings_rate: Decimal | int = (
+            sum(savings_rates, Decimal("0")) / len(savings_rates) if savings_rates else 0
+        )
+
+        # Simple volatility measure: average absolute month-to-month net change
+        volatility: Decimal | int = 0
+        if len(monthly_series) > 1:
+            deltas: list[Decimal] = []
+            prev_net: Decimal = monthly_series[0]["net"]
+            for entry in monthly_series[1:]:
+                current_net: Decimal = entry["net"]  # type: ignore
+                deltas.append(abs(current_net - prev_net))
+                prev_net = current_net
+            volatility = sum(deltas, Decimal("0")) / len(deltas) if deltas else 0
+
+        # Top-level composition for quick insight
+        total_flow = total_income + total_expenses
+        income_share: Decimal | int = (total_income / total_flow * 100) if total_flow > 0 else 0
+        expense_share: Decimal | int = (total_expenses / total_flow * 100) if total_flow > 0 else 0
+
+        return {
+            "total_income": total_income,
+            "total_expenses": total_expenses,
+            "net_income": net_income,
+            "average_income": average_income,
+            "average_expenses": average_expenses,
+            "average_net_income": average_net_income,
+            "document_count": document_count,
+            "overall_savings_rate": overall_savings_rate,
+            "average_savings_rate": average_savings_rate,
+            "positive_months": positive_months,
+            "negative_months": negative_months,
+            "zero_months": zero_months,
+            "best_month": best_month,
+            "worst_month": worst_month,
+            "longest_positive_streak": longest_positive_streak,
+            "monthly_series": monthly_series,
+            "volatility": volatility,
+            "income_share": income_share,
+            "expense_share": expense_share,
+        }
