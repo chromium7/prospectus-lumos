@@ -19,19 +19,19 @@ class AISettingsModelTests(TestCase):
         user = User.objects.create_user(username="tester", password="pass")
         settings = AISettings.objects.create(
             user=user,
-            api_token="sk-test-token",
-            model=AISettings.Model.GPT_4O,
+            api_token="test-api-key",
+            model=AISettings.Model.GEMINI_25_FLASH,
         )
         self.assertEqual(settings.user, user)
-        self.assertEqual(settings.api_token, "sk-test-token")
-        self.assertEqual(settings.model, AISettings.Model.GPT_4O)
+        self.assertEqual(settings.api_token, "test-api-key")
+        self.assertEqual(settings.model, AISettings.Model.GEMINI_25_FLASH)
         self.assertEqual(str(settings), "tester - AI Settings")
 
     def test_ai_settings_one_to_one(self) -> None:
         user = User.objects.create_user(username="tester", password="pass")
-        AISettings.objects.create(user=user, api_token="sk-token")
+        AISettings.objects.create(user=user, api_token="test-key")
         with self.assertRaises(IntegrityError):
-            AISettings.objects.create(user=user, api_token="sk-token-2")
+            AISettings.objects.create(user=user, api_token="test-key-2")
 
 
 class AISettingsViewTests(TestCase):
@@ -58,29 +58,29 @@ class AISettingsViewTests(TestCase):
 
         response = self.client.post(
             self.url,
-            {"api_token": "sk-new-token", "model": AISettings.Model.GPT_4O},
+            {"api_token": "test-key", "model": AISettings.Model.GEMINI_25_FLASH},
         )
         self.assertEqual(response.status_code, 302)
         self.assertTrue(AISettings.objects.filter(user=self.user).exists())
         settings = AISettings.objects.get(user=self.user)
-        self.assertEqual(settings.api_token, "sk-new-token")
-        self.assertEqual(settings.model, AISettings.Model.GPT_4O)
+        self.assertEqual(settings.api_token, "test-key")
+        self.assertEqual(settings.model, AISettings.Model.GEMINI_25_FLASH)
 
     def test_post_updates_existing_ai_settings(self) -> None:
         self.client.login(username="tester", password="pass")
-        AISettings.objects.create(user=self.user, api_token="sk-old-token")
+        AISettings.objects.create(user=self.user, api_token="old-key")
 
         response = self.client.post(
             self.url,
-            {"api_token": "sk-new-token", "model": AISettings.Model.GPT_35_TURBO},
+            {"api_token": "new-key", "model": AISettings.Model.GEMINI_15_FLASH},
         )
         self.assertEqual(response.status_code, 302)
         settings = AISettings.objects.get(user=self.user)
-        self.assertEqual(settings.api_token, "sk-new-token")
-        self.assertEqual(settings.model, AISettings.Model.GPT_35_TURBO)
+        self.assertEqual(settings.api_token, "new-key")
+        self.assertEqual(settings.model, AISettings.Model.GEMINI_15_FLASH)
 
     def test_post_empty_token_is_invalid(self) -> None:
-        request = self.factory.post(self.url, {"api_token": "", "model": AISettings.Model.GPT_4O})
+        request = self.factory.post(self.url, {"api_token": "", "model": AISettings.Model.GEMINI_25_FLASH})
         request.user = self.user
         from prospectus_lumos.website.ai_analysis.views import ai_settings_view
 
@@ -90,45 +90,44 @@ class AISettingsViewTests(TestCase):
 
 
 class AIServiceTests(TestCase):
-    def test_get_ai_insights_openai(self) -> None:
-        mock_client = MagicMock()
+    def test_get_ai_insights_gemini(self) -> None:
+        mock_model = MagicMock()
         mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = "Analysis: Spending is normal."
-        mock_client.chat.completions.create.return_value = mock_response
+        mock_response.text = "Analysis: Spending is normal."
+        mock_model.generate_content.return_value = mock_response
 
         with patch(
-            "prospectus_lumos.apps.ai_analysis.services.OpenAI",
-            return_value=mock_client,
-        ):
+            "prospectus_lumos.apps.ai_analysis.services.genai",
+        ) as mock_genai:
+            mock_genai.GenerativeModel.return_value = mock_model
             result = get_ai_insights(
-                api_token="sk-test",
-                model="gpt-4o",
+                api_token="test-key",
+                model="gemini-2.5-flash",
                 data_text="test data",
             )
 
         self.assertEqual(result, "Analysis: Spending is normal.")
-        mock_client.chat.completions.create.assert_called_once()
+        mock_genai.configure.assert_called_once_with(api_key="test-key")
+        mock_genai.GenerativeModel.assert_called_once_with("gemini-2.5-flash")
+        mock_model.generate_content.assert_called_once()
 
-    def test_get_ai_insights_anthropic(self) -> None:
-        mock_client = MagicMock()
+    def test_get_ai_insights_empty_response(self) -> None:
+        mock_model = MagicMock()
         mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = "Anthropic analysis."
-        mock_client.chat.completions.create.return_value = mock_response
+        mock_response.text = ""
+        mock_model.generate_content.return_value = mock_response
 
         with patch(
-            "prospectus_lumos.apps.ai_analysis.services.OpenAI",
-            return_value=mock_client,
-        ) as mock_openai:
+            "prospectus_lumos.apps.ai_analysis.services.genai",
+        ) as mock_genai:
+            mock_genai.GenerativeModel.return_value = mock_model
             result = get_ai_insights(
-                api_token="sk-test",
-                model="claude-3-sonnet-20240229",
+                api_token="test-key",
+                model="gemini-2.5-flash",
                 data_text="test data",
             )
 
-        self.assertEqual(result, "Anthropic analysis.")
-        mock_openai.assert_called_once()
+        self.assertEqual(result, "")
 
 
 class PrepareDataAsTextTests(TestCase):
