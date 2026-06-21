@@ -37,3 +37,14 @@ def idr(value: Any) -> str:
     Example: {{ 1234567|idr }} -> "Rp1.234.567"
     """
     return f"Rp{intdot(value)}"
+
+
+@register.filter(name="markdownify")
+def markdownify(value: str) -> str:
+    """Render Markdown text as HTML.
+
+    Example: {{ insights|markdownify|safe }}
+    """
+    import markdown
+
+    return markdown.markdown(value or "", extensions=["extra", "sane_lists"])
