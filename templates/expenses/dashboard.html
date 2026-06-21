@@ -13,7 +13,7 @@
     </div>
 
     {% if document_sources %}
-    <form method="post" action="{% url 'sync_documents' %}">
+    <form method="post" action="{% url 'sync_documents' %}" data-loading data-loading-text="Syncing documents from Google Drive...">
         {% csrf_token %}
         <button type="submit" class="btn btn-primary">
             <i class="bi bi-arrow-clockwise me-2"></i>
