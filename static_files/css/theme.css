@@ -206,3 +206,43 @@ body {
 .text-muted {
   color: var(--muted-text) !important;
 }
+
+/* Loading indicator overlay */
+.loading-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  background: rgba(255, 255, 255, 0.85);
+  justify-content: center;
+  align-items: center;
+}
+
+.loading-overlay.is-active {
+  display: flex;
+}
+
+.loading-overlay__content {
+  text-align: center;
+  padding: var(--space-8, 2rem);
+}
+
+.loading-overlay .spinner-border {
+  width: 3rem;
+  height: 3rem;
+  color: var(--primary-color);
+}
+
+.loading-overlay__text {
+  font-size: 1rem;
+  color: var(--text-color);
+  font-weight: 500;
+}
+
+.dark .loading-overlay {
+  background: rgba(11, 18, 32, 0.85);
+}
+
+.dark .loading-overlay__text {
+  color: var(--text-color);
+}
