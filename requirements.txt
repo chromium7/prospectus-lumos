@@ -11,4 +11,4 @@ Pillow==11.2.1
 google-api-python-client==2.117.0
 
 # AI analysis
-openai==1.82.0
+google-generativeai==0.8.5

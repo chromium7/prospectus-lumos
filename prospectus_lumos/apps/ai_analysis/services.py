@@ -4,7 +4,7 @@ import csv
 import io
 from typing import Any
 
-from openai import OpenAI
+import google.generativeai as genai
 
 
 SYSTEM_PROMPT = """You are a financial analyst assistant for a personal finance tracker called Prospectus Lumos.
@@ -31,52 +31,22 @@ Do NOT:
 
 
 def get_ai_insights(api_token: str, model: str, data_text: str) -> str:
-    """Send financial data to the AI model and return analysis insights.
+    """Send financial data to Google Gemini and return analysis insights.
 
     Args:
-        api_token: The OpenAI or Anthropic API key.
-        model: The model identifier (e.g. 'gpt-4o', 'claude-3-sonnet-20240229').
+        api_token: The Google Gemini API key.
+        model: The model identifier (e.g. 'gemini-2.5-flash').
         data_text: The financial data in CSV text format.
 
     Returns:
         The AI-generated insights as a string.
-
-    Raises:
-        openai.OpenAIError: If the API call fails.
     """
-    if model.startswith("claude-"):
-        return _call_anthropic(api_token, model, data_text)
-    return _call_openai(api_token, model, data_text)
-
-
-def _call_openai(api_token: str, model: str, data_text: str) -> str:
-    client = OpenAI(api_key=api_token)
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Here is the financial data to analyze:\n\n{data_text}"},
-        ],
+    genai.configure(api_key=api_token)
+    gemini_model = genai.GenerativeModel(model)
+    response = gemini_model.generate_content(
+        f"{SYSTEM_PROMPT}\n\nHere is the financial data to analyze:\n\n{data_text}",
     )
-    return response.choices[0].message.content or ""
-
-
-def _call_anthropic(api_token: str, model: str, data_text: str) -> str:
-    client = OpenAI(
-        base_url="https://api.anthropic.com/v1/",
-        api_key=api_token,
-    )
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Here is the financial data to analyze:\n\n{data_text}"},
-        ],
-        extra_body={
-            "max_tokens": 4096,
-        },
-    )
-    return response.choices[0].message.content or ""
+    return response.text or ""
 
 
 def prepare_data_as_text(documents: Any, analyzer_type: str) -> str:
