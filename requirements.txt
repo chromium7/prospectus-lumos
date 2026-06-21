@@ -9,3 +9,6 @@ psycopg2-binary==2.9.10
 Pillow==11.2.1
 # Google drive storage
 google-api-python-client==2.117.0
+
+# AI analysis
+google-generativeai==0.8.5

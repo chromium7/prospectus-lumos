@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+
+{% block title %}AI Settings - Prospectus Lumos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="mb-0">AI Analysis Settings</h1>
+        <small class="text-muted">Configure your AI provider to enable smart financial insights.</small>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">API Configuration</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label for="{{ form.api_token.id_for_label }}" class="form-label">API Token</label>
+                        {{ form.api_token }}
+                        <div class="form-text">
+                            Your Google Gemini API key from Google AI Studio.
+                            {% if ai_settings %}
+                                <span class="text-success">A token is currently saved.</span>
+                            {% endif %}
+                        </div>
+                        {% if form.api_token.errors %}
+                            <div class="text-danger">{{ form.api_token.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.model.id_for_label }}" class="form-label">Model</label>
+                        {{ form.model }}
+                        <div class="form-text">Select the AI model to use for analysis.</div>
+                        {% if form.model.errors %}
+                            <div class="text-danger">{{ form.model.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save me-1"></i> Save Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">About AI Analysis</h5>
+            </div>
+            <div class="card-body">
+                <p>AI analysis provides intelligent insights about your financial data, including:</p>
+                <ul>
+                    <li><strong>Trend detection</strong> — spot patterns in your income and spending over time</li>
+                    <li><strong>Anomaly alerts</strong> — identify unusual transactions or sudden changes</li>
+                    <li><strong>Savings suggestions</strong> — find categories where you could cut back</li>
+                    <li><strong>Fun facts</strong> — interesting observations about your financial habits</li>
+                </ul>
+                <p class="mb-0">
+                    <small class="text-muted">
+                        You need a valid API key from
+                        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>.
+                        Gemini offers a free tier suitable for personal use.
+                        Your API key is stored securely and only used for analysis you explicitly request.
+                    </small>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
