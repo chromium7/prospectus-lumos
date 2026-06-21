@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import csv
+import io
 from typing import Any
 
 from openai import OpenAI
@@ -87,9 +89,6 @@ def prepare_data_as_text(documents: Any, analyzer_type: str) -> str:
     Returns:
         CSV-formatted text string.
     """
-    import csv
-    import io
-
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["description", "amount", "category", "transaction_type", "year", "month"])
