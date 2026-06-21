@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load formatting %}
 
 {% block title %}AI Expense Analyzer - Prospectus Lumos{% endblock %}
 
@@ -71,8 +72,8 @@
         <h5 class="mb-0"><i class="bi bi-robot me-2"></i>AI Insights{{ filter_text }}</h5>
     </div>
     <div class="card-body">
-        <div class="ai-insights" style="white-space: pre-wrap; line-height: 1.7;">
-            {{ insights }}
+        <div class="ai-insights">
+            {{ insights|markdownify|safe }}
         </div>
     </div>
 </div>

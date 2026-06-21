@@ -207,6 +207,92 @@ body {
   color: var(--muted-text) !important;
 }
 
+/* AI insights markdown rendering */
+.ai-insights {
+  line-height: 1.75;
+  color: var(--text-color);
+}
+
+.ai-insights h1,
+.ai-insights h2,
+.ai-insights h3,
+.ai-insights h4 {
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.ai-insights h2 {
+  font-size: 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.35rem;
+}
+
+.ai-insights h3 {
+  font-size: 1.1rem;
+}
+
+.ai-insights p {
+  margin-bottom: 0.75rem;
+}
+
+.ai-insights ul,
+.ai-insights ol {
+  margin-bottom: 0.75rem;
+  padding-left: 1.5rem;
+}
+
+.ai-insights li {
+  margin-bottom: 0.25rem;
+}
+
+.ai-insights strong {
+  font-weight: 600;
+}
+
+.ai-insights em {
+  font-style: italic;
+}
+
+.ai-insights code {
+  background-color: var(--sidebar-bg);
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+  border: 1px solid var(--border-color);
+}
+
+.ai-insights blockquote {
+  border-left: 3px solid var(--primary-color);
+  padding-left: 1rem;
+  margin-left: 0;
+  color: var(--muted-text);
+}
+
+.ai-insights table {
+  width: 100%;
+  margin-bottom: 1rem;
+  border-collapse: collapse;
+}
+
+.ai-insights th,
+.ai-insights td {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-color);
+  text-align: left;
+}
+
+.ai-insights th {
+  background-color: var(--sidebar-bg);
+  font-weight: 600;
+}
+
+.ai-insights hr {
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: 1rem 0;
+}
+
 /* Loading indicator overlay */
 .loading-overlay {
   display: none;
