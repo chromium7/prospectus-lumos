@@ -14,8 +14,8 @@
 <!-- Filters -->
 <div class="card mb-4">
     <div class="card-body">
-        <form method="get" class="row g-3">
-            <div class="col-md-4">
+        <form method="get" id="filter-form" class="row g-3">
+            <div class="col-md-3">
                 <label for="year" class="form-label">Year</label>
                 <select class="form-select" id="year" name="year">
                     <option value="">All Years</option>
@@ -26,7 +26,7 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label for="month" class="form-label">Month</label>
                 <select class="form-select" id="month" name="month">
                     <option value="">All Months</option>
@@ -37,7 +37,35 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-4 d-flex align-items-end">
+            {% if available_categories %}
+            <div class="col-md-3">
+                <label class="form-label">Exclude Categories</label>
+                <div class="dropdown" id="exclude-category-dropdown">
+                    <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start d-flex justify-content-between align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="exclude-category-btn">
+                        <span id="exclude-category-label">
+                            {% if exclude_categories|length > 0 %}
+                                {{ exclude_categories|length }} excluded
+                            {% else %}
+                                None excluded
+                            {% endif %}
+                        </span>
+                    </button>
+                    <div class="dropdown-menu p-2" style="min-width: 100%; max-height: 280px; overflow-y: auto;" id="exclude-category-menu">
+                        <div class="d-flex justify-content-between mb-1 px-1">
+                            <small class="text-muted">Categories to exclude:</small>
+                            <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none" id="clear-exclude-categories">Clear</button>
+                        </div>
+                        {% for category in available_categories %}
+                        <label class="dropdown-item d-flex align-items-center gap-2 rounded" style="cursor: pointer;">
+                            <input type="checkbox" class="form-check-input exclude-category-checkbox" name="exclude_category" value="{{ category }}" {% if category in exclude_categories %}checked{% endif %}>
+                            <span>{{ category }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            <div class="col-md-3 d-flex align-items-end">
                 <button type="submit" class="btn btn-primary me-2">
                     <i class="bi bi-funnel"></i> Apply Filter
                 </button>
@@ -270,6 +298,40 @@
 
 {% block extra_js %}
 {{ block.super }}
+{% if available_categories %}
+<script>
+  (function() {
+    var dropdown = document.getElementById('exclude-category-dropdown');
+    var menu = document.getElementById('exclude-category-menu');
+    var label = document.getElementById('exclude-category-label');
+    var checkboxes = dropdown.querySelectorAll('.exclude-category-checkbox');
+    var clearBtn = document.getElementById('clear-exclude-categories');
+
+    // Prevent dropdown from closing when clicking inside the menu
+    if (menu) {
+      menu.addEventListener('click', function(e) {
+        e.stopPropagation();
+      });
+    }
+
+    function updateLabel() {
+      var count = dropdown.querySelectorAll('.exclude-category-checkbox:checked').length;
+      label.textContent = count > 0 ? count + ' excluded' : 'None excluded';
+    }
+
+    checkboxes.forEach(function(cb) {
+      cb.addEventListener('change', updateLabel);
+    });
+
+    if (clearBtn) {
+      clearBtn.addEventListener('click', function() {
+        checkboxes.forEach(function(cb) { cb.checked = false; });
+        updateLabel();
+      });
+    }
+  })();
+</script>
+{% endif %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 {% if analysis.income_by_category %}

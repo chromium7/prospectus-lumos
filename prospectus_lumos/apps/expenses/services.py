@@ -259,8 +259,13 @@ class ExpenseAnalyzerService:
     def __init__(self, user: Any) -> None:
         self.user = user
 
-    def get_income_analysis(self, year: int | None = None, month: int | None = None) -> Dict[str, Any]:
-        """Get income analysis for specified period"""
+    def get_income_analysis(
+        self,
+        year: int | None = None,
+        month: int | None = None,
+        exclude_categories: list[str] | None = None,
+    ) -> Dict[str, Any]:
+        """Get income analysis for specified period, optionally excluding categories."""
         documents = Document.objects.filter(user=self.user)
 
         if year:
@@ -268,17 +273,16 @@ class ExpenseAnalyzerService:
         if month:
             documents = documents.filter(month=month)
 
-        # Calculate totals
-        total_income: Decimal = sum((doc.total_income for doc in documents), Decimal("0"))
-        document_count: int = documents.count()
-        average_income: Decimal | int = total_income / document_count if document_count > 0 else 0
+        exclude_set = set(exclude_categories) if exclude_categories else set()
 
-        # Group by category
+        # Group by category (skip excluded)
         income_by_category: Dict[str, Dict[str, Any]] = {}
         for doc in documents:
             income_transactions = doc.transactions.filter(transaction_type="income")
             for transaction in income_transactions:
                 category = transaction.category or "Uncategorized"
+                if category in exclude_set:
+                    continue
                 if category not in income_by_category:
                     income_by_category[category] = {"total": Decimal("0"), "count": 0, "average": Decimal("0")}
                 income_by_category[category]["total"] += transaction.amount
@@ -290,6 +294,10 @@ class ExpenseAnalyzerService:
                 category_data["total"] / category_data["count"] if category_data["count"] else Decimal("0")
             )
 
+        total_income: Decimal = sum((cat["total"] for cat in income_by_category.values()), Decimal("0"))
+        document_count: int = documents.count()
+        average_income: Decimal | int = total_income / document_count if document_count > 0 else 0
+
         return {
             "total_income": total_income,
             "average_income": average_income,
@@ -298,8 +306,13 @@ class ExpenseAnalyzerService:
             "documents": documents.order_by("-year", "-month"),
         }
 
-    def get_expense_analysis(self, year: int | None = None, month: int | None = None) -> Dict[str, Any]:
-        """Get expense analysis for specified period"""
+    def get_expense_analysis(
+        self,
+        year: int | None = None,
+        month: int | None = None,
+        exclude_categories: list[str] | None = None,
+    ) -> Dict[str, Any]:
+        """Get expense analysis for specified period, optionally excluding categories."""
         documents = Document.objects.filter(user=self.user)
 
         if year:
@@ -307,17 +320,16 @@ class ExpenseAnalyzerService:
         if month:
             documents = documents.filter(month=month)
 
-        # Calculate totals
-        total_expenses: Decimal = sum((doc.total_expenses for doc in documents), Decimal("0"))
-        document_count: int = documents.count()
-        average_expenses: Decimal | int = total_expenses / document_count if document_count > 0 else 0
+        exclude_set = set(exclude_categories) if exclude_categories else set()
 
-        # Group by category
+        # Group by category (skip excluded)
         expenses_by_category: Dict[str, Dict[str, Any]] = {}
         for doc in documents:
             expense_transactions = doc.transactions.filter(transaction_type="expense")
             for transaction in expense_transactions:
                 category = transaction.category or "Uncategorized"
+                if category in exclude_set:
+                    continue
                 if category not in expenses_by_category:
                     expenses_by_category[category] = {"total": Decimal("0"), "count": 0, "average": Decimal("0")}
                 expenses_by_category[category]["total"] += transaction.amount
@@ -328,6 +340,10 @@ class ExpenseAnalyzerService:
             category_data["average"] = (
                 category_data["total"] / category_data["count"] if category_data["count"] else Decimal("0")
             )
+
+        total_expenses: Decimal = sum((cat["total"] for cat in expenses_by_category.values()), Decimal("0"))
+        document_count: int = documents.count()
+        average_expenses: Decimal | int = total_expenses / document_count if document_count > 0 else 0
 
         return {
             "total_expenses": total_expenses,

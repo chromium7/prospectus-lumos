@@ -164,13 +164,18 @@ def income_analyzer_view(request: TypedHttpRequest) -> HttpResponse:
     # Get filter parameters
     year_filter = request.GET.get("year", "")
     month_filter = request.GET.get("month", "")
+    exclude_categories = request.GET.getlist("exclude_category")
 
     # Convert to integers if provided
     year = int(year_filter) if year_filter else None
     month = int(month_filter) if month_filter else None
 
-    # Get analysis data
-    analysis = analyzer.get_income_analysis(year=year, month=month)
+    # Get available categories (without exclusion) for the dropdown
+    all_analysis = analyzer.get_income_analysis(year=year, month=month)
+    available_categories = list(all_analysis.get("income_by_category", {}).keys())
+
+    # Get analysis with exclusions applied
+    analysis = analyzer.get_income_analysis(year=year, month=month, exclude_categories=exclude_categories or None)
 
     # Get available years and months for filter dropdown
     available_years = (
@@ -182,6 +187,8 @@ def income_analyzer_view(request: TypedHttpRequest) -> HttpResponse:
         "analysis": analysis,
         "year_filter": year_filter,
         "month_filter": month_filter,
+        "exclude_categories": exclude_categories,
+        "available_categories": available_categories,
         "available_years": available_years,
         "available_months": available_months,
         "filter_text": f"for {month_filter}/{year_filter}" if year_filter or month_filter else "for all periods",
@@ -199,13 +206,18 @@ def expense_analyzer_view(request: TypedHttpRequest) -> HttpResponse:
     # Get filter parameters
     year_filter = request.GET.get("year", "")
     month_filter = request.GET.get("month", "")
+    exclude_categories = request.GET.getlist("exclude_category")
 
     # Convert to integers if provided
     year = int(year_filter) if year_filter else None
     month = int(month_filter) if month_filter else None
 
-    # Get analysis data
-    analysis = analyzer.get_expense_analysis(year=year, month=month)
+    # Get available categories (without exclusion) for the dropdown
+    all_analysis = analyzer.get_expense_analysis(year=year, month=month)
+    available_categories = list(all_analysis.get("expenses_by_category", {}).keys())
+
+    # Get analysis with exclusions applied
+    analysis = analyzer.get_expense_analysis(year=year, month=month, exclude_categories=exclude_categories or None)
 
     # Get available years and months for filter dropdown
     available_years = (
@@ -217,6 +229,8 @@ def expense_analyzer_view(request: TypedHttpRequest) -> HttpResponse:
         "analysis": analysis,
         "year_filter": year_filter,
         "month_filter": month_filter,
+        "exclude_categories": exclude_categories,
+        "available_categories": available_categories,
         "available_years": available_years,
         "available_months": available_months,
         "filter_text": f"for {month_filter}/{year_filter}" if year_filter or month_filter else "for all periods",
