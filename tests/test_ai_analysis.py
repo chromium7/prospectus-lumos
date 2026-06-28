@@ -200,6 +200,111 @@ class PrepareDataAsTextTests(TestCase):
         self.assertIn("Food", text)
         self.assertNotIn("Salary", text)
 
+    def test_prepare_data_summary_includes_accurate_totals(self) -> None:
+        doc = Document.objects.create(
+            user=self.user,
+            source=self.source,
+            month=6,
+            year=2025,
+        )
+        Transaction.objects.create(
+            document=doc,
+            transaction_type="expense",
+            date="2025-06-01",
+            amount=100000,
+            description="Groceries",
+            category="Food",
+        )
+        Transaction.objects.create(
+            document=doc,
+            transaction_type="expense",
+            date="2025-06-15",
+            amount=250000,
+            description="Electricity",
+            category="Utilities",
+        )
+        Transaction.objects.create(
+            document=doc,
+            transaction_type="income",
+            date="2025-06-15",
+            amount=5000000,
+            description="Salary",
+            category="Paycheck",
+        )
+
+        text = prepare_data_as_text([doc], "expense")
+        self.assertIn("=== PRE-COMPUTED SUMMARY", text)
+        self.assertIn("Total amount: Rp 350,000", text)
+        self.assertIn("Category subtotals:", text)
+        self.assertIn("Utilities: Rp 250,000 (71.4%)", text)
+        self.assertIn("Food: Rp 100,000 (28.6%)", text)
+        self.assertIn("=== END SUMMARY ===", text)
+
+    def test_prepare_data_summary_income(self) -> None:
+        doc = Document.objects.create(
+            user=self.user,
+            source=self.source,
+            month=6,
+            year=2025,
+        )
+        Transaction.objects.create(
+            document=doc,
+            transaction_type="income",
+            date="2025-06-15",
+            amount=5000000,
+            description="Salary",
+            category="Paycheck",
+        )
+        Transaction.objects.create(
+            document=doc,
+            transaction_type="income",
+            date="2025-06-20",
+            amount=1500000,
+            description="Freelance",
+            category="Side Income",
+        )
+        Transaction.objects.create(
+            document=doc,
+            transaction_type="expense",
+            date="2025-06-01",
+            amount=100000,
+            description="Groceries",
+            category="Food",
+        )
+
+        text = prepare_data_as_text([doc], "income")
+        self.assertIn("Total amount: Rp 6,500,000", text)
+        self.assertIn("Paycheck: Rp 5,000,000 (76.9%)", text)
+        self.assertIn("Side Income: Rp 1,500,000 (23.1%)", text)
+
+    def test_prepare_data_summary_portfolio(self) -> None:
+        doc = Document.objects.create(
+            user=self.user,
+            source=self.source,
+            month=6,
+            year=2025,
+        )
+        Transaction.objects.create(
+            document=doc,
+            transaction_type="income",
+            date="2025-06-15",
+            amount=5000000,
+            description="Salary",
+            category="Paycheck",
+        )
+        Transaction.objects.create(
+            document=doc,
+            transaction_type="expense",
+            date="2025-06-01",
+            amount=100000,
+            description="Groceries",
+            category="Food",
+        )
+
+        text = prepare_data_as_text([doc], "portfolio")
+        self.assertIn("Total amount: Rp 5,100,000", text)
+        self.assertIn("Transaction count: 2", text)
+
     def test_prepare_portfolio_data_as_text(self) -> None:
         doc = Document.objects.create(
             user=self.user,
