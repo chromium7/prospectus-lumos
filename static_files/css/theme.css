@@ -110,11 +110,17 @@ body {
 .dark select,
 .dark textarea,
 .dark .form-control,
-.dark .form-select,
 .dark .form-check-input {
   background-color: var(--card-bg);
   color: var(--text-color);
   border-color: var(--border-color);
+}
+
+.dark .form-select {
+  background-color: var(--card-bg);
+  color: var(--text-color);
+  border-color: var(--border-color);
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%239aa9c2' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
 }
 
 .dark .navbar,
@@ -194,6 +200,40 @@ body {
 .dark .btn-outline-success:hover,
 .dark .btn-outline-danger:hover {
   background: #1f2937;
+}
+
+/* Dropdown menus */
+.dark .dropdown-menu {
+  background-color: var(--card-bg);
+  border-color: var(--border-color);
+}
+
+.dark .dropdown-item {
+  color: var(--text-color);
+}
+
+.dark .dropdown-item:hover,
+.dark .dropdown-item:focus {
+  background-color: #1e293b;
+  color: var(--text-color);
+}
+
+.dark .dropdown-item.active,
+.dark .dropdown-item:active {
+  background-color: var(--primary-color);
+  color: #fff;
+}
+
+.dark .dropdown-divider {
+  border-color: var(--border-color);
+}
+
+.dark .btn-link {
+  color: var(--muted-text);
+}
+
+.dark .btn-link:hover {
+  color: var(--text-color);
 }
 
 /* Utilities for legibility */
