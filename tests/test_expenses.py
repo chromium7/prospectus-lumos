@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tempfile
 from tempfile import TemporaryDirectory
 from unittest.mock import patch, MagicMock
 
@@ -11,7 +12,7 @@ from django.urls import reverse
 from libraries.google_cloud.tuples import File
 from prospectus_lumos.apps.accounts.models import GoogleDriveCredentials, DocumentSource
 from prospectus_lumos.apps.documents.models import Document
-from prospectus_lumos.apps.expenses.services import ExpenseSheetService
+from prospectus_lumos.apps.expenses.services import ExpenseAnalyzerService, ExpenseSheetService
 from prospectus_lumos.apps.transactions.models import Transaction
 
 
@@ -188,3 +189,136 @@ class SyncDocumentsViewTests(TestCase):
         # Django's test response does not always expose 'url'; use 'headers' or 'wsgi_request'
         self.assertIn(reverse("dashboard"), response.headers.get("Location", ""))
         self.assertTrue(sync_mock.called)
+
+
+class ExpenseAnalyzerServiceExcludeTests(TestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(username="tester", password="pass")
+        self.source = DocumentSource.objects.create(user=self.user, source_type="google_drive", name="Main")
+
+        self.doc = Document.objects.create(user=self.user, source=self.source, month=8, year=2025)
+
+        Transaction.objects.create(
+            document=self.doc, transaction_type="expense", amount=10000, description="Rice", category="Food"
+        )
+        Transaction.objects.create(
+            document=self.doc, transaction_type="expense", amount=5000, description="Bus", category="Transport"
+        )
+        Transaction.objects.create(
+            document=self.doc, transaction_type="expense", amount=2000, description="Candy", category="Food"
+        )
+        Transaction.objects.create(
+            document=self.doc, transaction_type="income", amount=100000, description="Salary", category="Paycheck"
+        )
+        Transaction.objects.create(
+            document=self.doc, transaction_type="income", amount=20000, description="Freelance", category="Side Hustle"
+        )
+
+    def test_expense_analysis_excludes_single_category(self) -> None:
+        service = ExpenseAnalyzerService(self.user)
+        analysis = service.get_expense_analysis(exclude_categories=["Transport"])
+        cats = analysis["expenses_by_category"]
+        self.assertNotIn("Transport", cats)
+        self.assertIn("Food", cats)
+        # Total should exclude Transport
+        self.assertEqual(analysis["total_expenses"], 12000)  # 10000 + 2000
+
+    def test_expense_analysis_excludes_multiple_categories(self) -> None:
+        service = ExpenseAnalyzerService(self.user)
+        analysis = service.get_expense_analysis(exclude_categories=["Food", "Transport"])
+        self.assertEqual(analysis["expenses_by_category"], {})
+        self.assertEqual(analysis["total_expenses"], 0)
+
+    def test_income_analysis_excludes_category(self) -> None:
+        service = ExpenseAnalyzerService(self.user)
+        analysis = service.get_income_analysis(exclude_categories=["Side Hustle"])
+        cats = analysis["income_by_category"]
+        self.assertNotIn("Side Hustle", cats)
+        self.assertIn("Paycheck", cats)
+        self.assertEqual(analysis["total_income"], 100000)
+
+    def test_analysis_unaffected_when_exclude_is_none(self) -> None:
+        service = ExpenseAnalyzerService(self.user)
+        analysis = service.get_expense_analysis(exclude_categories=None)
+        cats = analysis["expenses_by_category"]
+        self.assertIn("Food", cats)
+        self.assertIn("Transport", cats)
+        self.assertEqual(analysis["total_expenses"], 17000)
+
+    def test_analysis_unaffected_when_exclude_is_empty(self) -> None:
+        service = ExpenseAnalyzerService(self.user)
+        analysis = service.get_expense_analysis(exclude_categories=[])
+        cats = analysis["expenses_by_category"]
+        self.assertIn("Food", cats)
+        self.assertIn("Transport", cats)
+        self.assertEqual(analysis["total_expenses"], 17000)
+
+
+class AnalyzerViewExcludeTests(TestCase):
+    def setUp(self) -> None:
+        self._media_override = override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+        self._media_override.enable()
+        self.addCleanup(self._media_override.disable)
+
+        self.user = User.objects.create_user(username="tester", password="pass")
+        self.source = DocumentSource.objects.create(user=self.user, source_type="google_drive", name="Main")
+
+        self.doc = Document.objects.create(user=self.user, source=self.source, month=8, year=2025)
+
+        Transaction.objects.create(
+            document=self.doc, transaction_type="expense", amount=5000, description="Bus", category="Transport"
+        )
+        Transaction.objects.create(
+            document=self.doc, transaction_type="expense", amount=10000, description="Rice", category="Food"
+        )
+        Transaction.objects.create(
+            document=self.doc, transaction_type="income", amount=100000, description="Salary", category="Paycheck"
+        )
+        Transaction.objects.create(
+            document=self.doc, transaction_type="income", amount=20000, description="Freelance", category="Side Hustle"
+        )
+
+    def test_expense_analyzer_view_includes_exclude_categories_context(self) -> None:
+        self.client.login(username="tester", password="pass")
+        url = reverse("expense_analyzer") + "?exclude_category=Transport"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        ctx = response.context
+        self.assertIn("Transport", ctx["exclude_categories"])
+        self.assertNotIn("Transport", ctx["analysis"]["expenses_by_category"])
+
+    def test_income_analyzer_view_includes_exclude_categories_context(self) -> None:
+        self.client.login(username="tester", password="pass")
+        url = reverse("income_analyzer") + "?exclude_category=Side+Hustle"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        ctx = response.context
+        self.assertIn("Side Hustle", ctx["exclude_categories"])
+        self.assertNotIn("Side Hustle", ctx["analysis"]["income_by_category"])
+
+    def test_expense_analyzer_view_multiple_excluded_categories(self) -> None:
+        self.client.login(username="tester", password="pass")
+        url = reverse("expense_analyzer") + "?exclude_category=Transport&exclude_category=Food"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        ctx = response.context
+        self.assertEqual(len(ctx["exclude_categories"]), 2)
+        self.assertEqual(ctx["analysis"]["total_expenses"], 0)
+
+    def test_expense_analyzer_view_no_exclusions(self) -> None:
+        self.client.login(username="tester", password="pass")
+        url = reverse("expense_analyzer")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        ctx = response.context
+        self.assertEqual(ctx["exclude_categories"], [])
+        self.assertEqual(ctx["analysis"]["total_expenses"], 15000)
+
+    def test_available_categories_in_context(self) -> None:
+        self.client.login(username="tester", password="pass")
+        url = reverse("expense_analyzer")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        ctx = response.context
+        self.assertIn("available_categories", ctx)
+        self.assertEqual(set(ctx["available_categories"]), {"Food", "Transport"})
