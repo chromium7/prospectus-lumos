@@ -1,0 +1,46 @@
+.planner-layout {
+    display: grid;
+    gap: 1.5rem;
+    grid-template-columns: minmax(0, 2fr) minmax(18rem, 1fr);
+}
+
+.planner-summary {
+    align-self: start;
+    position: sticky;
+    top: 1rem;
+}
+
+.summary-label {
+    color: var(--bs-secondary-color);
+    font-size: .85rem;
+    margin-bottom: .1rem;
+}
+
+.summary-value {
+    font-size: 1.35rem;
+    font-weight: 700;
+}
+
+.errorlist {
+    color: var(--bs-danger);
+    font-size: .875rem;
+    list-style: none;
+    margin: .25rem 0 0;
+    padding: 0;
+}
+
+details.card > summary {
+    cursor: pointer;
+}
+
+@media (max-width: 991.98px) {
+    .planner-layout {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .planner-summary {
+        order: -1;
+        position: static;
+    }
+}

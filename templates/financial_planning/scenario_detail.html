@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% load formatting %}
+
+{% block title %}{{ plan.name }} version {{ scenario.version }} - Prospectus Lumos{% endblock %}
+{% block content %}
+<a class="small text-decoration-none" href="{% url 'freedom_plan_list' %}"><i class="bi bi-arrow-left"></i> All plans</a>
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mt-2 mb-4"><div><h1 class="h2 mb-1">{{ plan.name }}</h1><p class="text-muted mb-0">Saved version {{ scenario.version }} · {{ scenario.saved_at|date:"j F Y, H:i" }}</p></div><span class="badge text-bg-success"><i class="bi bi-lock-fill me-1"></i>Immutable</span></div>
+<div class="alert alert-info">Based on these assumptions, your target is <strong>{{ scenario.total_target|idr }}</strong> by {{ scenario.target_date|date:"F Y" }}.</div>
+<div class="row g-3 mb-4">
+  <div class="col-md-6 col-xl-3"><div class="card h-100 shadow-sm"><div class="card-body"><div class="text-muted small">Freedom number today</div><div class="h4">{{ scenario.base_freedom_number|idr }}</div></div></div></div>
+  <div class="col-md-6 col-xl-3"><div class="card h-100 shadow-sm"><div class="card-body"><div class="text-muted small">Total target</div><div class="h4">{{ scenario.total_target|idr }}</div></div></div></div>
+  <div class="col-md-6 col-xl-3"><div class="card h-100 shadow-sm"><div class="card-body"><div class="text-muted small">Required monthly investment</div><div class="h4">{% if scenario.required_monthly_investment is not None %}{{ scenario.required_monthly_investment|idr }}{% else %}Outside estimate bounds{% endif %}</div></div></div></div>
+  <div class="col-md-6 col-xl-3"><div class="card h-100 shadow-sm"><div class="card-body"><div class="text-muted small">Current-pace date</div><div class="h4">{{ scenario.projected_achievement_date|date:"M Y"|default:"Not reached" }}</div><div class="small text-muted">Funding gap {{ scenario.funding_gap|idr }}/month</div></div></div></div>
+</div>
+<div class="card shadow-sm mb-4"><div class="card-body"><h2 class="h5">Saved inputs</h2><dl class="row mb-0"><dt class="col-sm-6">Investable assets</dt><dd class="col-sm-6">{{ scenario.current_investable_assets|idr }}</dd><dt class="col-sm-6">Current monthly investment</dt><dd class="col-sm-6">{{ scenario.current_monthly_investment|idr }}</dd><dt class="col-sm-6">Desired monthly lifestyle</dt><dd class="col-sm-6">{{ scenario.desired_monthly_lifestyle|idr }}</dd><dt class="col-sm-6">Status</dt><dd class="col-sm-6">{{ scenario.get_result_status_display }}</dd></dl></div></div>
+<div class="d-flex flex-wrap gap-2 mb-4">
+  <form method="post" action="{% url 'freedom_scenario_update' plan.id scenario.id %}">{% csrf_token %}<button class="btn btn-primary" type="submit">Create updated version</button></form>
+  <form method="post" action="{% url 'freedom_scenario_duplicate' plan.id scenario.id %}">{% csrf_token %}<button class="btn btn-outline-primary" type="submit">Duplicate to new plan</button></form>
+  <form method="post" action="{% url 'freedom_plan_archive' plan.id %}">{% csrf_token %}<button class="btn btn-outline-secondary" type="submit">Archive plan</button></form>
+</div>
+<p class="small text-muted border-top pt-3">This is an educational estimate based on the assumptions you entered. Investment returns, inflation, and sustainable withdrawals can differ materially. It is not personalized financial advice.</p>
+{% endblock %}
