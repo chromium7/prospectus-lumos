@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% load static formatting %}
+
+{% block title %}{% if plan %}{{ plan.name }}{% else %}Create plan{% endif %} - Prospectus Lumos{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/financial_planning.css' %}">{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+  <div>
+    <a class="small text-decoration-none" href="{% url 'freedom_plan_list' %}"><i class="bi bi-arrow-left"></i> All plans</a>
+    <h1 class="h2 mt-2 mb-1">{% if plan %}{{ plan.name }}{% else %}Create a Financial Freedom Plan{% endif %}</h1>
+    <p class="text-muted mb-0">Build an educational estimate from manual inputs. You can revise this draft until you save it.</p>
+  </div>
+  {% if draft and draft.based_on %}<span class="badge text-bg-light">Based on version {{ draft.based_on.version }}</span>{% endif %}
+</div>
+
+<form method="post" class="planner-form" novalidate>
+  {% csrf_token %}
+  {{ form.calculation_date }}
+  {% if form.errors or plan_form.errors %}
+    <div class="alert alert-danger" role="alert" tabindex="-1">
+      <strong>Please review the highlighted fields.</strong>
+      {{ form.non_field_errors }}{{ plan_form.non_field_errors }}
+    </div>
+  {% endif %}
+
+  <div class="planner-layout">
+    <div>
+      {% if plan_form %}
+      <section class="card shadow-sm mb-3">
+        <div class="card-body">
+          <h2 class="h5">Name your plan</h2>
+          <div class="mb-3">
+            <label class="form-label" for="{{ plan_form.name.id_for_label }}">Plan name</label>
+            {{ plan_form.name }}{{ plan_form.name.errors }}
+          </div>
+          <div>
+            <label class="form-label" for="{{ plan_form.description.id_for_label }}">Description <span class="text-muted">(optional)</span></label>
+            {{ plan_form.description }}{{ plan_form.description.errors }}
+          </div>
+        </div>
+      </section>
+      {% endif %}
+
+      <section class="card shadow-sm mb-3">
+        <div class="card-body">
+          <h2 class="h5">Goal and lifestyle</h2>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="{{ form.target_date.id_for_label }}">Target date</label>
+              {{ form.target_date }}{{ form.target_date.errors }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="{{ form.birth_date.id_for_label }}">Birth date <span class="text-muted">(optional)</span></label>
+              {{ form.birth_date }}{{ form.birth_date.errors }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="{{ form.desired_monthly_lifestyle.id_for_label }}">Desired monthly lifestyle (today's IDR)</label>
+              {{ form.desired_monthly_lifestyle }}{{ form.desired_monthly_lifestyle.errors }}
+              <div class="form-text">{{ form.desired_monthly_lifestyle.help_text }}</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="{{ form.post_freedom_monthly_income.id_for_label }}">Monthly income after freedom</label>
+              {{ form.post_freedom_monthly_income }}{{ form.post_freedom_monthly_income.errors }}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card shadow-sm mb-3">
+        <div class="card-body">
+          <h2 class="h5">Starting point</h2>
+          <div class="row g-3">
+            <div class="col-md-6"><label class="form-label" for="{{ form.current_investable_assets.id_for_label }}">Investable assets</label>{{ form.current_investable_assets }}{{ form.current_investable_assets.errors }}<div class="form-text">{{ form.current_investable_assets.help_text }}</div></div>
+            <div class="col-md-6"><label class="form-label" for="{{ form.current_monthly_investment.id_for_label }}">Current monthly investment</label>{{ form.current_monthly_investment }}{{ form.current_monthly_investment.errors }}</div>
+            <div class="col-md-6"><label class="form-label" for="{{ form.current_monthly_income.id_for_label }}">Current monthly income</label>{{ form.current_monthly_income }}{{ form.current_monthly_income.errors }}</div>
+            <div class="col-md-6"><label class="form-label" for="{{ form.current_monthly_expenses.id_for_label }}">Current monthly expenses</label>{{ form.current_monthly_expenses }}{{ form.current_monthly_expenses.errors }}</div>
+            <div class="col-md-6"><label class="form-label" for="{{ form.emergency_savings.id_for_label }}">Emergency savings</label>{{ form.emergency_savings }}{{ form.emergency_savings.errors }}</div>
+            <div class="col-md-6 d-flex align-items-end"><div class="form-check mb-2">{{ form.include_emergency_reserve_in_target }}<label class="form-check-label" for="{{ form.include_emergency_reserve_in_target.id_for_label }}">Include emergency savings in target</label></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card shadow-sm mb-3">
+        <div class="card-body">
+          <h2 class="h5">Life events</h2>
+          <p class="text-muted mb-0">Life events are reserved for the next planner phase. This version calculates a useful manual plan without them.</p>
+        </div>
+      </section>
+
+      <details class="card shadow-sm mb-3">
+        <summary class="card-header fw-semibold">Advanced assumptions</summary>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6"><label class="form-label" for="{{ form.withdrawal_rate.id_for_label }}">Withdrawal rate (%)</label>{{ form.withdrawal_rate }}{{ form.withdrawal_rate.errors }}</div>
+            <div class="col-md-6"><label class="form-label" for="{{ form.annual_return_rate.id_for_label }}">Nominal annual return (%)</label>{{ form.annual_return_rate }}{{ form.annual_return_rate.errors }}</div>
+            <div class="col-md-6"><label class="form-label" for="{{ form.annual_inflation_rate.id_for_label }}">Annual inflation (%)</label>{{ form.annual_inflation_rate }}{{ form.annual_inflation_rate.errors }}</div>
+            <div class="col-md-6"><label class="form-label" for="{{ form.safety_buffer_rate.id_for_label }}">Safety buffer (%)</label>{{ form.safety_buffer_rate }}{{ form.safety_buffer_rate.errors }}</div>
+            <div class="col-md-6"><label class="form-label" for="{{ form.annual_income_growth_rate.id_for_label }}">Annual income growth (%)</label>{{ form.annual_income_growth_rate }}{{ form.annual_income_growth_rate.errors }}</div>
+            <div class="col-md-6"><label class="form-label" for="{{ form.annual_contribution_growth_rate.id_for_label }}">Annual contribution growth (%)</label>{{ form.annual_contribution_growth_rate }}{{ form.annual_contribution_growth_rate.errors }}</div>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <aside class="planner-summary" aria-live="polite">
+      <div class="card shadow-sm border-primary">
+        <div class="card-body">
+          <h2 class="h5">Your current estimate</h2>
+          {% if draft %}
+            <p class="summary-label">Freedom number today</p><p class="summary-value">{{ draft.base_freedom_number|idr }}</p>
+            <p class="summary-label">Total target at {{ draft.target_date|date:"M Y" }}</p><p class="summary-value">{{ draft.total_target|idr }}</p>
+            <p class="summary-label">Required monthly investment</p><p class="summary-value">{% if draft.required_monthly_investment is not None %}{{ draft.required_monthly_investment|idr }}{% else %}Outside estimate bounds{% endif %}</p>
+            <p class="small text-muted">Status: {{ draft.get_result_status_display }}. Results are recalculated by the server.</p>
+          {% else %}
+            <p class="text-muted">Create the plan to see the server-calculated freedom number and monthly investment estimate.</p>
+          {% endif %}
+          <div class="d-grid gap-2">
+            {% if draft %}
+              <button class="btn btn-outline-primary" type="submit">Recalculate draft</button>
+              <button class="btn btn-primary" type="submit" formaction="{% url 'freedom_plan_save' plan.id %}">Save immutable version</button>
+            {% else %}
+              <button class="btn btn-primary" type="submit">Create plan and calculate</button>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</form>
+{% endblock %}

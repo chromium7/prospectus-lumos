@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% load formatting %}
+
+{% block title %}Financial Freedom Plans - Prospectus Lumos{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+  <div><h1 class="h2 mb-1">Financial Freedom Plans</h1><p class="text-muted mb-0">Forward-looking estimates based on assumptions you control.</p></div>
+  <a class="btn btn-primary" href="{% url 'freedom_plan_create' %}"><i class="bi bi-plus-lg me-1"></i>Create plan</a>
+</div>
+<div class="mb-3">
+  {% if show_archived %}<a href="{% url 'freedom_plan_list' %}">View active plans</a>{% else %}<a href="{% url 'freedom_plan_list' %}?archived=1">View archived plans</a>{% endif %}
+</div>
+{% if plans %}
+<div class="row g-3">
+  {% for plan in plans %}
+  <div class="col-xl-6"><article class="card h-100 shadow-sm"><div class="card-body">
+    <div class="d-flex justify-content-between gap-2"><h2 class="h5">{{ plan.name }}</h2>{% if plan.is_archived %}<span class="badge text-bg-secondary">Archived</span>{% elif plan.library_draft %}<span class="badge text-bg-warning">Draft</span>{% else %}<span class="badge text-bg-success">Saved</span>{% endif %}</div>
+    {% if plan.description %}<p class="text-muted">{{ plan.description }}</p>{% endif %}
+    {% if plan.library_latest %}
+    <dl class="row small mb-3"><dt class="col-6">Latest version</dt><dd class="col-6">{{ plan.library_latest.version }} · {{ plan.library_latest.saved_at|date:"j M Y" }}</dd><dt class="col-6">Target date</dt><dd class="col-6">{{ plan.library_latest.target_date|date:"M Y" }}</dd><dt class="col-6">Total target</dt><dd class="col-6">{{ plan.library_latest.total_target|idr }}</dd><dt class="col-6">Required monthly</dt><dd class="col-6">{% if plan.library_latest.required_monthly_investment is not None %}{{ plan.library_latest.required_monthly_investment|idr }}{% else %}Outside bounds{% endif %}</dd><dt class="col-6">Current-pace date</dt><dd class="col-6">{{ plan.library_latest.projected_achievement_date|date:"M Y"|default:"Not reached" }}</dd><dt class="col-6">Status</dt><dd class="col-6">{{ plan.library_latest.get_result_status_display }}</dd></dl>
+    {% else %}<p class="text-muted">No saved version yet.</p>{% endif %}
+    <div class="d-flex flex-wrap gap-2">
+      {% if plan.library_draft %}<a class="btn btn-sm btn-primary" href="{% url 'freedom_plan_draft' plan.id %}">Continue draft</a>{% endif %}
+      {% if plan.library_latest %}<a class="btn btn-sm btn-outline-primary" href="{% url 'freedom_scenario_detail' plan.id plan.library_latest.id %}">Open result</a>{% endif %}
+      <form method="post" action="{% if plan.is_archived %}{% url 'freedom_plan_restore' plan.id %}{% else %}{% url 'freedom_plan_archive' plan.id %}{% endif %}">{% csrf_token %}<button class="btn btn-sm btn-outline-secondary" type="submit">{% if plan.is_archived %}Restore{% else %}Archive{% endif %}</button></form>
+    </div>
+    <details class="mt-3"><summary class="small text-muted">Rename plan</summary><form class="input-group input-group-sm mt-2" method="post" action="{% url 'freedom_plan_rename' plan.id %}">{% csrf_token %}<label class="visually-hidden" for="rename-{{ plan.id }}">New plan name</label><input class="form-control" id="rename-{{ plan.id }}" name="name" maxlength="120" value="{{ plan.name }}" required><button class="btn btn-outline-secondary" type="submit">Rename</button></form></details>
+  </div></article></div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card shadow-sm"><div class="card-body py-5 text-center"><i class="bi bi-compass display-5 text-primary"></i><h2 class="h4 mt-3">{% if show_archived %}No archived plans{% else %}Start with a manual estimate{% endif %}</h2><p class="text-muted">You do not need tracked transaction history to build your first plan.</p>{% if not show_archived %}<a class="btn btn-primary" href="{% url 'freedom_plan_create' %}">Create a manual plan</a>{% endif %}</div></div>
+{% endif %}
+{% endblock %}
