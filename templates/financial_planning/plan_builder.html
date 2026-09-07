@@ -9,123 +9,115 @@
   <div>
     <a class="small text-decoration-none" href="{% url 'freedom_plan_list' %}"><i class="bi bi-arrow-left"></i> All plans</a>
     <h1 class="h2 mt-2 mb-1">{% if plan %}{{ plan.name }}{% else %}Create a Financial Freedom Plan{% endif %}</h1>
-    <p class="text-muted mb-0">Build an educational estimate from manual inputs. You can revise this draft until you save it.</p>
+    <p class="text-muted mb-0">Build an educational estimate manually or start from an editable tracked-finance snapshot.</p>
   </div>
   {% if draft and draft.based_on %}<span class="badge text-bg-light">Based on version {{ draft.based_on.version }}</span>{% endif %}
 </div>
 
-<form method="post" class="planner-form" novalidate>
+<form method="post" class="planner-form" novalidate data-planner-form data-preview-url="{% url 'freedom_calculate_preview' %}"{% if plan %} data-plan-id="{{ plan.id }}"{% endif %}>
   {% csrf_token %}
-  {{ form.calculation_date }}
-  {% if form.errors or plan_form.errors %}
-    <div class="alert alert-danger" role="alert" tabindex="-1">
+  {{ form.calculation_date }}{{ form.source_mode }}{{ form.source_period_start }}{{ form.source_period_end }}{{ form.source_month_count }}{{ form.source_excluded_income_categories }}{{ form.source_excluded_expense_categories }}
+  {% if form.errors or plan_form.errors or event_formset.errors or event_formset.non_form_errors %}
+    <div class="alert alert-danger" role="alert" tabindex="-1" data-validation-summary>
       <strong>Please review the highlighted fields.</strong>
-      {{ form.non_field_errors }}{{ plan_form.non_field_errors }}
+      {{ form.non_field_errors }}{{ plan_form.non_field_errors }}{{ event_formset.non_form_errors }}
     </div>
   {% endif %}
 
   <div class="planner-layout">
     <div>
       {% if plan_form %}
-      <section class="card shadow-sm mb-3">
-        <div class="card-body">
-          <h2 class="h5">Name your plan</h2>
-          <div class="mb-3">
-            <label class="form-label" for="{{ plan_form.name.id_for_label }}">Plan name</label>
-            {{ plan_form.name }}{{ plan_form.name.errors }}
-          </div>
-          <div>
-            <label class="form-label" for="{{ plan_form.description.id_for_label }}">Description <span class="text-muted">(optional)</span></label>
-            {{ plan_form.description }}{{ plan_form.description.errors }}
-          </div>
-        </div>
-      </section>
+      <section class="card shadow-sm mb-3"><div class="card-body">
+        <h2 class="h5">Name your plan</h2>
+        <div class="mb-3"><label class="form-label" for="{{ plan_form.name.id_for_label }}">Plan name</label>{{ plan_form.name }}{{ plan_form.name.errors }}</div>
+        <div><label class="form-label" for="{{ plan_form.description.id_for_label }}">Description <span class="text-muted">(optional)</span></label>{{ plan_form.description }}{{ plan_form.description.errors }}</div>
+      </div></section>
       {% endif %}
 
-      <section class="card shadow-sm mb-3">
-        <div class="card-body">
-          <h2 class="h5">Goal and lifestyle</h2>
-          <div class="row g-3">
-            <div class="col-md-6">
-              <label class="form-label" for="{{ form.target_date.id_for_label }}">Target date</label>
-              {{ form.target_date }}{{ form.target_date.errors }}
-            </div>
-            <div class="col-md-6">
-              <label class="form-label" for="{{ form.birth_date.id_for_label }}">Birth date <span class="text-muted">(optional)</span></label>
-              {{ form.birth_date }}{{ form.birth_date.errors }}
-            </div>
-            <div class="col-md-6">
-              <label class="form-label" for="{{ form.desired_monthly_lifestyle.id_for_label }}">Desired monthly lifestyle (today's IDR)</label>
-              {{ form.desired_monthly_lifestyle }}{{ form.desired_monthly_lifestyle.errors }}
-              <div class="form-text">{{ form.desired_monthly_lifestyle.help_text }}</div>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label" for="{{ form.post_freedom_monthly_income.id_for_label }}">Monthly income after freedom</label>
-              {{ form.post_freedom_monthly_income }}{{ form.post_freedom_monthly_income.errors }}
-            </div>
-          </div>
+      <section class="card shadow-sm mb-3"><div class="card-body">
+        <div class="d-flex flex-wrap justify-content-between gap-2 align-items-start">
+          <div><h2 class="h5 mb-1">Start from tracked finances</h2><p class="text-muted small">Optional suggestions only. You can edit every imported amount before saving.</p></div>
+          {% if draft.source_mode == 'tracked_actuals' %}<span class="badge text-bg-info">Using {{ draft.source_month_count }} frozen month{{ draft.source_month_count|pluralize }}</span>{% endif %}
         </div>
-      </section>
+        {{ actuals_form.non_field_errors }}
+        <div class="row g-3">
+          <div class="col-md-4"><label class="form-label" for="{{ actuals_form.period.id_for_label }}">Source period</label>{{ actuals_form.period }}{{ actuals_form.period.errors }}</div>
+          <div class="col-md-4"><label class="form-label" for="{{ actuals_form.start_year.id_for_label }}">From year</label>{{ actuals_form.start_year }}{{ actuals_form.start_year.errors }}</div>
+          <div class="col-md-4"><label class="form-label" for="{{ actuals_form.end_year.id_for_label }}">To year</label>{{ actuals_form.end_year }}{{ actuals_form.end_year.errors }}</div>
+          {% if actuals_form.excluded_income_categories.field.choices %}<div class="col-md-6"><fieldset><legend class="form-label">Exclude income categories</legend>{{ actuals_form.excluded_income_categories }}{{ actuals_form.excluded_income_categories.errors }}</fieldset></div>{% endif %}
+          {% if actuals_form.excluded_expense_categories.field.choices %}<div class="col-md-6"><fieldset><legend class="form-label">Exclude expense categories</legend>{{ actuals_form.excluded_expense_categories }}{{ actuals_form.excluded_expense_categories.errors }}</fieldset></div>{% endif %}
+          <div class="col-12"><button class="btn btn-outline-primary" type="submit" name="action" value="load_actuals">Load tracked suggestions</button></div>
+        </div>
+        {% if actuals_snapshot %}<div class="alert alert-info mt-3 mb-0" role="status"><strong>{{ actuals_snapshot.month_count }} represented complete month{{ actuals_snapshot.month_count|pluralize }} loaded.</strong>{% if actuals_snapshot.source_period_start %} {{ actuals_snapshot.source_period_start|date:"M Y" }}–{{ actuals_snapshot.source_period_end|date:"M Y" }}.{% endif %}<ul class="mb-0 mt-1">{% for warning in actuals_snapshot.warnings %}<li>{{ warning }}</li>{% empty %}<li>No source-data warnings.</li>{% endfor %}</ul></div>{% endif %}
+        {% if draft.source_mode == 'tracked_actuals' and not actuals_snapshot %}<p class="small text-muted mt-3 mb-0">Frozen source: {{ draft.source_period_start|date:"M Y" }}–{{ draft.source_period_end|date:"M Y" }}, {{ draft.source_month_count }} represented month{{ draft.source_month_count|pluralize }}. Refresh only by using the button above.</p>{% endif %}
+      </div></section>
 
-      <section class="card shadow-sm mb-3">
-        <div class="card-body">
-          <h2 class="h5">Starting point</h2>
-          <div class="row g-3">
-            <div class="col-md-6"><label class="form-label" for="{{ form.current_investable_assets.id_for_label }}">Investable assets</label>{{ form.current_investable_assets }}{{ form.current_investable_assets.errors }}<div class="form-text">{{ form.current_investable_assets.help_text }}</div></div>
-            <div class="col-md-6"><label class="form-label" for="{{ form.current_monthly_investment.id_for_label }}">Current monthly investment</label>{{ form.current_monthly_investment }}{{ form.current_monthly_investment.errors }}</div>
-            <div class="col-md-6"><label class="form-label" for="{{ form.current_monthly_income.id_for_label }}">Current monthly income</label>{{ form.current_monthly_income }}{{ form.current_monthly_income.errors }}</div>
-            <div class="col-md-6"><label class="form-label" for="{{ form.current_monthly_expenses.id_for_label }}">Current monthly expenses</label>{{ form.current_monthly_expenses }}{{ form.current_monthly_expenses.errors }}</div>
-            <div class="col-md-6"><label class="form-label" for="{{ form.emergency_savings.id_for_label }}">Emergency savings</label>{{ form.emergency_savings }}{{ form.emergency_savings.errors }}</div>
-            <div class="col-md-6 d-flex align-items-end"><div class="form-check mb-2">{{ form.include_emergency_reserve_in_target }}<label class="form-check-label" for="{{ form.include_emergency_reserve_in_target.id_for_label }}">Include emergency savings in target</label></div></div>
-          </div>
+      <section class="card shadow-sm mb-3"><div class="card-body">
+        <h2 class="h5">Goal and lifestyle</h2>
+        <div class="row g-3">
+          <div class="col-md-6"><label class="form-label" for="{{ form.target_date.id_for_label }}">Target date</label>{{ form.target_date }}{{ form.target_date.errors }}</div>
+          <div class="col-md-6"><label class="form-label" for="{{ form.birth_date.id_for_label }}">Birth date <span class="text-muted">(optional)</span></label>{{ form.birth_date }}{{ form.birth_date.errors }}</div>
+          <div class="col-md-6"><label class="form-label" for="{{ form.desired_monthly_lifestyle.id_for_label }}">Desired monthly lifestyle (today's IDR)</label>{{ form.desired_monthly_lifestyle }}{{ form.desired_monthly_lifestyle.errors }}<div class="form-text">{{ form.desired_monthly_lifestyle.help_text }}</div></div>
+          <div class="col-md-6"><label class="form-label" for="{{ form.post_freedom_monthly_income.id_for_label }}">Monthly income after freedom</label>{{ form.post_freedom_monthly_income }}{{ form.post_freedom_monthly_income.errors }}</div>
         </div>
-      </section>
+      </div></section>
 
-      <section class="card shadow-sm mb-3">
-        <div class="card-body">
-          <h2 class="h5">Life events</h2>
-          <p class="text-muted mb-0">Life events are reserved for the next planner phase. This version calculates a useful manual plan without them.</p>
+      <section class="card shadow-sm mb-3"><div class="card-body">
+        <h2 class="h5">Starting point</h2>
+        <div class="row g-3">
+          <div class="col-md-6"><label class="form-label" for="{{ form.current_investable_assets.id_for_label }}">Investable assets</label>{{ form.current_investable_assets }}{{ form.current_investable_assets.errors }}<div class="form-text">{{ form.current_investable_assets.help_text }}</div></div>
+          <div class="col-md-6"><label class="form-label" for="{{ form.current_monthly_investment.id_for_label }}">Current monthly investment</label>{{ form.current_monthly_investment }}{{ form.current_monthly_investment.errors }}</div>
+          <div class="col-md-6"><label class="form-label" for="{{ form.current_monthly_income.id_for_label }}">Current monthly income</label>{{ form.current_monthly_income }}{{ form.current_monthly_income.errors }}</div>
+          <div class="col-md-6"><label class="form-label" for="{{ form.current_monthly_expenses.id_for_label }}">Current monthly expenses</label>{{ form.current_monthly_expenses }}{{ form.current_monthly_expenses.errors }}</div>
+          <div class="col-md-6"><label class="form-label" for="{{ form.emergency_savings.id_for_label }}">Emergency savings</label>{{ form.emergency_savings }}{{ form.emergency_savings.errors }}</div>
+          <div class="col-md-6 d-flex align-items-end"><div class="form-check mb-2">{{ form.include_emergency_reserve_in_target }}<label class="form-check-label" for="{{ form.include_emergency_reserve_in_target.id_for_label }}">Include emergency savings in target</label></div></div>
         </div>
-      </section>
+      </div></section>
 
-      <details class="card shadow-sm mb-3">
-        <summary class="card-header fw-semibold">Advanced assumptions</summary>
-        <div class="card-body">
-          <div class="row g-3">
-            <div class="col-md-6"><label class="form-label" for="{{ form.withdrawal_rate.id_for_label }}">Withdrawal rate (%)</label>{{ form.withdrawal_rate }}{{ form.withdrawal_rate.errors }}</div>
-            <div class="col-md-6"><label class="form-label" for="{{ form.annual_return_rate.id_for_label }}">Nominal annual return (%)</label>{{ form.annual_return_rate }}{{ form.annual_return_rate.errors }}</div>
-            <div class="col-md-6"><label class="form-label" for="{{ form.annual_inflation_rate.id_for_label }}">Annual inflation (%)</label>{{ form.annual_inflation_rate }}{{ form.annual_inflation_rate.errors }}</div>
-            <div class="col-md-6"><label class="form-label" for="{{ form.safety_buffer_rate.id_for_label }}">Safety buffer (%)</label>{{ form.safety_buffer_rate }}{{ form.safety_buffer_rate.errors }}</div>
-            <div class="col-md-6"><label class="form-label" for="{{ form.annual_income_growth_rate.id_for_label }}">Annual income growth (%)</label>{{ form.annual_income_growth_rate }}{{ form.annual_income_growth_rate.errors }}</div>
-            <div class="col-md-6"><label class="form-label" for="{{ form.annual_contribution_growth_rate.id_for_label }}">Annual contribution growth (%)</label>{{ form.annual_contribution_growth_rate }}{{ form.annual_contribution_growth_rate.errors }}</div>
-          </div>
+      <section class="card shadow-sm mb-3"><div class="card-body">
+        <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+          <div><h2 class="h5 mb-1">Life events</h2><p class="text-muted small mb-0">Portfolio-funded events affect the projection. Separate savings are disclosed outside it.</p></div>
+          <div class="d-flex gap-2"><label class="visually-hidden" for="event-preset">Event preset</label><select class="form-select form-select-sm" id="event-preset" data-event-preset><option value="">Choose preset</option>{% for key, preset in event_presets.items %}<option value="{{ key }}">{{ preset.label }}</option>{% endfor %}</select><button class="btn btn-sm btn-outline-primary" type="button" data-add-event>Add event</button></div>
         </div>
-      </details>
+        {{ event_formset.management_form }}
+        <div data-event-list>{% for event_form in event_formset.forms %}{% include "financial_planning/partials/event_form.html" with event_number=forloop.counter %}{% endfor %}</div>
+        <template data-empty-event>{% include "financial_planning/partials/event_form.html" with event_form=event_formset.empty_form event_number="__number__" %}</template>
+        <noscript><p class="form-text">One blank event row is available per submit. Recalculate to add another row or mark an existing row for deletion.</p></noscript>
+      </div></section>
+
+      <details class="card shadow-sm mb-3"><summary class="card-header fw-semibold">Advanced assumptions</summary><div class="card-body"><div class="row g-3">
+        <div class="col-md-6"><label class="form-label" for="{{ form.withdrawal_rate.id_for_label }}">Withdrawal rate (%)</label>{{ form.withdrawal_rate }}{{ form.withdrawal_rate.errors }}</div>
+        <div class="col-md-6"><label class="form-label" for="{{ form.annual_return_rate.id_for_label }}">Nominal annual return (%)</label>{{ form.annual_return_rate }}{{ form.annual_return_rate.errors }}</div>
+        <div class="col-md-6"><label class="form-label" for="{{ form.annual_inflation_rate.id_for_label }}">Annual inflation (%)</label>{{ form.annual_inflation_rate }}{{ form.annual_inflation_rate.errors }}</div>
+        <div class="col-md-6"><label class="form-label" for="{{ form.safety_buffer_rate.id_for_label }}">Safety buffer (%)</label>{{ form.safety_buffer_rate }}{{ form.safety_buffer_rate.errors }}</div>
+        <div class="col-md-6"><label class="form-label" for="{{ form.annual_income_growth_rate.id_for_label }}">Annual income growth (%)</label>{{ form.annual_income_growth_rate }}{{ form.annual_income_growth_rate.errors }}</div>
+        <div class="col-md-6"><label class="form-label" for="{{ form.annual_contribution_growth_rate.id_for_label }}">Annual contribution growth (%)</label>{{ form.annual_contribution_growth_rate }}{{ form.annual_contribution_growth_rate.errors }}</div>
+      </div></div></details>
     </div>
 
-    <aside class="planner-summary" aria-live="polite">
-      <div class="card shadow-sm border-primary">
-        <div class="card-body">
-          <h2 class="h5">Your current estimate</h2>
-          {% if draft %}
-            <p class="summary-label">Freedom number today</p><p class="summary-value">{{ draft.base_freedom_number|idr }}</p>
-            <p class="summary-label">Total target at {{ draft.target_date|date:"M Y" }}</p><p class="summary-value">{{ draft.total_target|idr }}</p>
-            <p class="summary-label">Required monthly investment</p><p class="summary-value">{% if draft.required_monthly_investment is not None %}{{ draft.required_monthly_investment|idr }}{% else %}Outside estimate bounds{% endif %}</p>
-            <p class="small text-muted">Status: {{ draft.get_result_status_display }}. Results are recalculated by the server.</p>
-          {% else %}
-            <p class="text-muted">Create the plan to see the server-calculated freedom number and monthly investment estimate.</p>
-          {% endif %}
-          <div class="d-grid gap-2">
-            {% if draft %}
-              <button class="btn btn-outline-primary" type="submit">Recalculate draft</button>
-              <button class="btn btn-primary" type="submit" formaction="{% url 'freedom_plan_save' plan.id %}">Save immutable version</button>
-            {% else %}
-              <button class="btn btn-primary" type="submit">Create plan and calculate</button>
-            {% endif %}
-          </div>
-        </div>
-      </div>
+    <aside class="planner-summary" aria-live="polite" aria-busy="false" data-preview-summary>
+      <div class="card shadow-sm border-primary"><div class="card-body">
+        <div class="d-flex align-items-center justify-content-between"><h2 class="h5">Your current estimate</h2><span class="spinner-border spinner-border-sm text-primary d-none" role="status" aria-label="Updating estimate" data-preview-loading></span></div>
+        <div class="alert alert-warning py-2 d-none" data-preview-error>Preview unavailable. Your current inputs are unchanged; you can retry or submit normally.</div>
+        {% if draft %}
+          <p class="summary-label">Freedom number today</p><p class="summary-value" data-summary-freedom>{{ draft.base_freedom_number|idr }}</p>
+          <p class="summary-label">Total target at {{ draft.target_date|date:"M Y" }}</p><p class="summary-value" data-summary-target>{{ draft.total_target|idr }}</p>
+          <p class="summary-label">Required monthly investment</p><p class="summary-value" data-summary-required>{% if draft.required_monthly_investment is not None %}{{ draft.required_monthly_investment|idr }}{% else %}Outside estimate bounds{% endif %}</p>
+          <p class="small text-muted" data-summary-status>Status: {{ draft.get_result_status_display }}. Results are recalculated by the server.</p>
+        {% else %}
+          <p class="text-muted" data-summary-empty>Create the plan or edit inputs to see a server-calculated estimate.</p>
+          <p class="summary-label">Freedom number today</p><p class="summary-value" data-summary-freedom>—</p>
+          <p class="summary-label">Total target</p><p class="summary-value" data-summary-target>—</p>
+          <p class="summary-label">Required monthly investment</p><p class="summary-value" data-summary-required>—</p>
+          <p class="small text-muted" data-summary-status>Results are calculated by the server.</p>
+        {% endif %}
+        <div class="preview-events small mb-3" data-preview-events></div>
+        <div class="d-grid gap-2">{% if draft %}<button class="btn btn-outline-primary" type="submit">Recalculate draft</button><button class="btn btn-primary" type="submit" formaction="{% url 'freedom_plan_save' plan.id %}">Save immutable version</button>{% else %}<button class="btn btn-primary" type="submit">Create plan and calculate</button>{% endif %}</div>
+      </div></div>
     </aside>
   </div>
 </form>
+{{ event_presets|json_script:"event-presets-data" }}
 {% endblock %}
+
+{% block extra_js %}{{ block.super }}<script src="{% static 'js/financial_planning.js' %}"></script>{% endblock %}

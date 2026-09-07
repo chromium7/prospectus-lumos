@@ -5,7 +5,7 @@
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
   <div><h1 class="h2 mb-1">Financial Freedom Plans</h1><p class="text-muted mb-0">Forward-looking estimates based on assumptions you control.</p></div>
-  <a class="btn btn-primary" href="{% url 'freedom_plan_create' %}"><i class="bi bi-plus-lg me-1"></i>Create plan</a>
+  <div class="d-flex flex-wrap gap-2"><a class="btn btn-outline-primary" href="{% url 'freedom_plan_create' %}?source=tracked_actuals&amp;period=12m"><i class="bi bi-clock-history me-1"></i>Use tracked finances</a><a class="btn btn-primary" href="{% url 'freedom_plan_create' %}"><i class="bi bi-plus-lg me-1"></i>Create plan</a></div>
 </div>
 <div class="mb-3">
   {% if show_archived %}<a href="{% url 'freedom_plan_list' %}">View active plans</a>{% else %}<a href="{% url 'freedom_plan_list' %}?archived=1">View archived plans</a>{% endif %}
@@ -29,6 +29,6 @@
   {% endfor %}
 </div>
 {% else %}
-<div class="card shadow-sm"><div class="card-body py-5 text-center"><i class="bi bi-compass display-5 text-primary"></i><h2 class="h4 mt-3">{% if show_archived %}No archived plans{% else %}Start with a manual estimate{% endif %}</h2><p class="text-muted">You do not need tracked transaction history to build your first plan.</p>{% if not show_archived %}<a class="btn btn-primary" href="{% url 'freedom_plan_create' %}">Create a manual plan</a>{% endif %}</div></div>
+    <div class="card shadow-sm"><div class="card-body py-5 text-center"><i class="bi bi-compass display-5 text-primary"></i><h2 class="h4 mt-3">{% if show_archived %}No archived plans{% else %}Start with a manual estimate{% endif %}</h2><p class="text-muted">You do not need tracked transaction history to build your first plan.</p>{% if not show_archived %}<div class="d-flex justify-content-center flex-wrap gap-2"><a class="btn btn-primary" href="{% url 'freedom_plan_create' %}">Create a manual plan</a><a class="btn btn-outline-primary" href="{% url 'freedom_plan_create' %}?source=tracked_actuals&amp;period=12m">Use tracked finances</a></div>{% endif %}</div></div>
 {% endif %}
 {% endblock %}
