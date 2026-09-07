@@ -33,6 +33,20 @@ details.card > summary {
     cursor: pointer;
 }
 
+.event-form {
+    background: var(--bs-tertiary-bg);
+}
+
+.event-delete-control {
+    font-size: .875rem;
+}
+
+.preview-events:not(:empty) {
+    border-top: 1px solid var(--bs-border-color);
+    color: var(--bs-secondary-color);
+    padding-top: .75rem;
+}
+
 @media (max-width: 991.98px) {
     .planner-layout {
         display: flex;

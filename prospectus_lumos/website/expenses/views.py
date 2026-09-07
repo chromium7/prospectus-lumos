@@ -7,6 +7,7 @@ from django.views.decorators.http import require_http_methods
 from django.core.paginator import Paginator
 from django.db.models import Q
 from collections import Counter
+from urllib.parse import urlencode
 from django.utils import timezone
 
 from prospectus_lumos.apps.accounts.models import DocumentSource
@@ -257,8 +258,12 @@ def portfolio_analyzer_view(request: TypedHttpRequest) -> HttpResponse:
         year_from_str = str(year_from)
         year_to_str = str(year_to)
     else:
-        year_from = int(year_from_str) if year_from_str else None
-        year_to = int(year_to_str) if year_to_str else None
+        try:
+            year_from = int(year_from_str) if year_from_str else None
+            year_to = int(year_to_str) if year_to_str else None
+        except ValueError:
+            year_from = year_to = None
+            year_from_str = year_to_str = ""
 
     # Normalize if user inverted the range
     if year_from is not None and year_to is not None and year_from > year_to:
@@ -287,6 +292,17 @@ def portfolio_analyzer_view(request: TypedHttpRequest) -> HttpResponse:
         "available_years": available_years,
         "filter_text": filter_text,
         "selected_tab": "portfolio",
+        "freedom_plan_query": urlencode(
+            {
+                "source": "tracked_actuals",
+                "period": "custom" if year_from is not None and year_to is not None else "12m",
+                **(
+                    {"start_year": year_from, "end_year": year_to}
+                    if year_from is not None and year_to is not None
+                    else {}
+                ),
+            }
+        ),
     }
 
     return render(request, "expenses/portfolio_analyzer.html", context)

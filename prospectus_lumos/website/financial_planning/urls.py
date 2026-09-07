@@ -5,6 +5,8 @@ from . import views
 urlpatterns = [
     path("", views.plan_list_view, name="freedom_plan_list"),
     path("new/", views.plan_create_view, name="freedom_plan_create"),
+    path("actuals-preview/", views.actuals_preview_view, name="freedom_actuals_preview"),
+    path("calculate-preview/", views.calculate_preview_view, name="freedom_calculate_preview"),
     path("<int:plan_id>/draft/", views.plan_draft_view, name="freedom_plan_draft"),
     path("<int:plan_id>/save/", views.plan_save_view, name="freedom_plan_save"),
     path(

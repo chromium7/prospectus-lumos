@@ -1,20 +1,32 @@
 from __future__ import annotations
 
+from typing import Any, cast
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Prefetch
-from django.http import HttpResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from prospectus_lumos.apps.financial_planning.models import FreedomPlan, FreedomScenario
 from prospectus_lumos.apps.financial_planning.services import (
+    ActualsSnapshot,
+    ActualsSnapshotService,
     DraftAlreadyExistsError,
     FreedomScenarioService,
 )
 from prospectus_lumos.core.utils import TypedHttpRequest
 
-from .forms import FreedomPlanForm, FreedomScenarioForm
+from .forms import (
+    EVENT_PRESETS,
+    ActualsSnapshotForm,
+    BaseFinancialEventFormSet,
+    FinancialEventFormSet,
+    FreedomPlanForm,
+    FreedomScenarioForm,
+    event_formset_values,
+)
 
 
 def _owned_plan(request: TypedHttpRequest, plan_id: int) -> FreedomPlan:
@@ -36,14 +48,62 @@ def _builder_context(
     draft: FreedomScenario | None,
     form: FreedomScenarioForm,
     plan_form: FreedomPlanForm | None,
+    event_formset: BaseFinancialEventFormSet,
+    actuals_form: ActualsSnapshotForm,
+    actuals_snapshot: ActualsSnapshot | None = None,
 ) -> dict[str, object]:
     return {
         "plan": plan,
         "draft": draft,
         "form": form,
         "plan_form": plan_form,
+        "event_formset": event_formset,
+        "event_presets": EVENT_PRESETS,
+        "actuals_form": actuals_form,
+        "actuals_snapshot": actuals_snapshot,
         "selected_tab": "financial_freedom",
     }
+
+
+def _event_formset(
+    request: HttpRequest,
+    *,
+    instance: FreedomScenario | None,
+    calculation_date: object = None,
+) -> tuple[BaseFinancialEventFormSet, bool]:
+    submitted = request.method == "POST" and "events-TOTAL_FORMS" in request.POST
+    formset = cast(
+        BaseFinancialEventFormSet,
+        FinancialEventFormSet(
+            request.POST if submitted else None,
+            instance=instance or FreedomScenario(),
+            prefix="events",
+            calculation_date=calculation_date,
+        ),
+    )
+    return formset, submitted
+
+
+def _snapshot_from_form(request: TypedHttpRequest, form: ActualsSnapshotForm) -> ActualsSnapshot | None:
+    if not form.is_valid():
+        return None
+    return ActualsSnapshotService(user=request.user).create_snapshot(**form.snapshot_options())
+
+
+def _snapshot_initial(snapshot: ActualsSnapshot, *, base: dict[str, object] | None = None) -> dict[str, object]:
+    return {**(base or {}), **snapshot.scenario_values()}
+
+
+def _actuals_form_from_query(request: TypedHttpRequest) -> tuple[ActualsSnapshotForm, ActualsSnapshot | None]:
+    if request.GET.get("source") != FreedomScenario.SourceMode.TRACKED_ACTUALS:
+        return ActualsSnapshotForm(user=request.user), None
+    query_data = {
+        "period": request.GET.get("period", "12m"),
+        "start_year": request.GET.get("start_year", ""),
+        "end_year": request.GET.get("end_year", ""),
+    }
+    form = ActualsSnapshotForm(query_data, user=request.user)
+    return form, _snapshot_from_form(request, form)
 
 
 @login_required
@@ -88,19 +148,56 @@ def plan_create_view(request: TypedHttpRequest) -> HttpResponse:
     """Create a manual plan and calculated editable draft."""
 
     plan_form = FreedomPlanForm(request.POST or None)
-    scenario_form = FreedomScenarioForm(request.POST or None, initial=FreedomScenarioForm.initial_values())
-    if request.method == "POST" and plan_form.is_valid() and scenario_form.is_valid():
+    actuals_form, actuals_snapshot = _actuals_form_from_query(request)
+    initial = FreedomScenarioForm.initial_values()
+    if actuals_snapshot:
+        initial = _snapshot_initial(actuals_snapshot, base=initial)
+    scenario_form = FreedomScenarioForm(request.POST or None, initial=initial)
+    if request.method == "POST" and request.POST.get("action") == "load_actuals":
+        actuals_form = ActualsSnapshotForm(request.POST, user=request.user)
+        actuals_snapshot = _snapshot_from_form(request, actuals_form)
+        if actuals_snapshot:
+            current_values = scenario_form.scenario_values() if scenario_form.is_valid() else initial
+            scenario_form = FreedomScenarioForm(initial=_snapshot_initial(actuals_snapshot, base=current_values))
+        event_formset, _ = _event_formset(request, instance=None)
+        return render(
+            request,
+            "financial_planning/plan_builder.html",
+            _builder_context(
+                plan=None,
+                draft=None,
+                form=scenario_form,
+                plan_form=plan_form,
+                event_formset=event_formset,
+                actuals_form=actuals_form,
+                actuals_snapshot=actuals_snapshot,
+            ),
+        )
+    scenario_valid = scenario_form.is_valid() if request.method == "POST" else False
+    calculation_date = scenario_form.cleaned_data.get("calculation_date") if scenario_valid else None
+    event_formset, events_submitted = _event_formset(request, instance=None, calculation_date=calculation_date)
+    events_valid = event_formset.is_valid() if events_submitted else True
+    if request.method == "POST" and plan_form.is_valid() and scenario_valid and events_valid:
         draft = FreedomScenarioService().create_plan_with_draft(
             user=request.user,
             plan_data=plan_form.cleaned_data,
             scenario_data=scenario_form.scenario_values(),
+            events=event_formset_values(event_formset) if events_submitted else (),
         )
         messages.success(request, "Plan created. Review the estimate, then save when you are ready.")
         return redirect("freedom_plan_draft", plan_id=draft.plan_id)
     return render(
         request,
         "financial_planning/plan_builder.html",
-        _builder_context(plan=None, draft=None, form=scenario_form, plan_form=plan_form),
+        _builder_context(
+            plan=None,
+            draft=None,
+            form=scenario_form,
+            plan_form=plan_form,
+            event_formset=event_formset,
+            actuals_form=actuals_form,
+            actuals_snapshot=actuals_snapshot,
+        ),
     )
 
 
@@ -112,16 +209,58 @@ def plan_draft_view(request: TypedHttpRequest, plan_id: int) -> HttpResponse:
     plan = _owned_plan(request, plan_id)
     draft = get_object_or_404(FreedomScenario, plan=plan, status=FreedomScenario.Status.DRAFT)
     form = FreedomScenarioForm(request.POST or None, instance=draft)
-    if request.method == "POST" and form.is_valid():
+    actuals_form = ActualsSnapshotForm(
+        request.POST if request.POST.get("action") == "load_actuals" else None,
+        user=request.user,
+    )
+    actuals_snapshot = None
+    if request.method == "POST" and request.POST.get("action") == "load_actuals":
+        actuals_snapshot = _snapshot_from_form(request, actuals_form)
+        if actuals_snapshot:
+            current_values = form.scenario_values() if form.is_valid() else {}
+            form = FreedomScenarioForm(
+                instance=draft,
+                initial=_snapshot_initial(actuals_snapshot, base=current_values),
+            )
+        event_formset, _ = _event_formset(request, instance=draft)
+        return render(
+            request,
+            "financial_planning/plan_builder.html",
+            _builder_context(
+                plan=plan,
+                draft=draft,
+                form=form,
+                plan_form=None,
+                event_formset=event_formset,
+                actuals_form=actuals_form,
+                actuals_snapshot=actuals_snapshot,
+            ),
+        )
+    form_valid = form.is_valid() if request.method == "POST" else False
+    calculation_date = form.cleaned_data.get("calculation_date") if form_valid else draft.calculation_date
+    event_formset, events_submitted = _event_formset(request, instance=draft, calculation_date=calculation_date)
+    events_valid = event_formset.is_valid() if events_submitted else True
+    if request.method == "POST" and form_valid and events_valid:
         draft = FreedomScenarioService().update_draft(
-            user=request.user, draft=draft, scenario_data=form.scenario_values()
+            user=request.user,
+            draft=draft,
+            scenario_data=form.scenario_values(),
+            events=event_formset_values(event_formset) if events_submitted else None,
         )
         messages.success(request, "Estimate recalculated from your current inputs.")
         return redirect("freedom_plan_draft", plan_id=plan.pk)
     return render(
         request,
         "financial_planning/plan_builder.html",
-        _builder_context(plan=plan, draft=draft, form=form, plan_form=None),
+        _builder_context(
+            plan=plan,
+            draft=draft,
+            form=form,
+            plan_form=None,
+            event_formset=event_formset,
+            actuals_form=actuals_form,
+            actuals_snapshot=actuals_snapshot,
+        ),
     )
 
 
@@ -134,15 +273,32 @@ def plan_save_view(request: TypedHttpRequest, plan_id: int) -> HttpResponse:
     draft = get_object_or_404(FreedomScenario, plan=plan, status=FreedomScenario.Status.DRAFT)
     if request.POST:
         form = FreedomScenarioForm(request.POST, instance=draft)
-        if not form.is_valid():
+        form_valid = form.is_valid()
+        event_formset, events_submitted = _event_formset(
+            request,
+            instance=draft,
+            calculation_date=form.cleaned_data.get("calculation_date") if form_valid else draft.calculation_date,
+        )
+        events_valid = event_formset.is_valid() if events_submitted else True
+        if not form_valid or not events_valid:
             return render(
                 request,
                 "financial_planning/plan_builder.html",
-                _builder_context(plan=plan, draft=draft, form=form, plan_form=None),
+                _builder_context(
+                    plan=plan,
+                    draft=draft,
+                    form=form,
+                    plan_form=None,
+                    event_formset=event_formset,
+                    actuals_form=ActualsSnapshotForm(user=request.user),
+                ),
                 status=400,
             )
         draft = FreedomScenarioService().update_draft(
-            user=request.user, draft=draft, scenario_data=form.scenario_values()
+            user=request.user,
+            draft=draft,
+            scenario_data=form.scenario_values(),
+            events=event_formset_values(event_formset) if events_submitted else None,
         )
     scenario = FreedomScenarioService().save_draft(user=request.user, draft=draft)
     messages.success(request, f"Saved immutable scenario version {scenario.version}.")
@@ -224,3 +380,87 @@ def plan_restore_view(request: TypedHttpRequest, plan_id: int) -> HttpResponse:
     FreedomScenarioService().set_archived(user=request.user, plan=_owned_plan(request, plan_id), archived=False)
     messages.success(request, "Plan restored.")
     return redirect("freedom_plan_list")
+
+
+@login_required
+@require_POST
+def calculate_preview_view(request: TypedHttpRequest) -> JsonResponse:
+    """Return a server-authoritative transient scenario preview."""
+
+    plan_id = request.POST.get("plan_id")
+    draft = None
+    if plan_id:
+        try:
+            normalized_plan_id = int(plan_id)
+        except ValueError:
+            return JsonResponse({"ok": False, "errors": {"plan_id": ["Invalid plan."]}}, status=400)
+        plan = _owned_plan(request, normalized_plan_id)
+        draft = get_object_or_404(FreedomScenario, plan=plan, status=FreedomScenario.Status.DRAFT)
+    form = FreedomScenarioForm(request.POST, instance=draft)
+    form_valid = form.is_valid()
+    event_formset, events_submitted = _event_formset(
+        request,
+        instance=draft,
+        calculation_date=form.cleaned_data.get("calculation_date") if form_valid else None,
+    )
+    events_valid = event_formset.is_valid() if events_submitted else True
+    request_id = request.POST.get("preview_request_id", "")[:64]
+    if not form_valid or not events_valid:
+        return JsonResponse(
+            {
+                "ok": False,
+                "request_id": request_id,
+                "errors": {
+                    "scenario": form.errors.get_json_data(),
+                    "events": [errors.get_json_data() for errors in event_formset.errors],
+                    "event_formset": list(event_formset.non_form_errors()),
+                },
+            },
+            status=400,
+        )
+    result = FreedomScenarioService().calculate_preview(
+        scenario_data=form.scenario_values(),
+        events=event_formset_values(event_formset) if events_submitted else [],
+    )
+    payload = cast(dict[str, Any], result.to_payload())
+    base_case = payload["cases"]["base"]
+    return JsonResponse(
+        {
+            "ok": True,
+            "request_id": request_id,
+            "schema_version": payload["schema_version"],
+            "calculation_version": payload["calculation_version"],
+            "summary": {
+                "base_freedom_number": payload["target_breakdown"]["base_freedom_number_today"],
+                "total_target": payload["target_breakdown"]["total_target"],
+                "required_monthly_investment": base_case["required_contribution"]["monthly_contribution"],
+                "projected_achievement_date": base_case["achievement"]["date"],
+                "funding_gap": payload["funding_gap"],
+                "progress_percent": payload["progress_percent"],
+                "status": payload["status"],
+            },
+            "timeline": [
+                {
+                    "date": row["date"],
+                    "closing_balance": row["closing_balance"],
+                    "target": row["target"],
+                    "event_outflow": row["event_outflow"],
+                }
+                for row in payload["monthly"]
+            ],
+            "separate_savings": payload["separate_savings"],
+            "warnings": payload["warnings"],
+        }
+    )
+
+
+@login_required
+@require_POST
+def actuals_preview_view(request: TypedHttpRequest) -> JsonResponse:
+    """Return a JSON-safe preview of an owned tracked-finance snapshot."""
+
+    form = ActualsSnapshotForm(request.POST, user=request.user)
+    snapshot = _snapshot_from_form(request, form)
+    if snapshot is None:
+        return JsonResponse({"ok": False, "errors": form.errors.get_json_data()}, status=400)
+    return JsonResponse({"ok": True, "snapshot": snapshot.to_payload()})

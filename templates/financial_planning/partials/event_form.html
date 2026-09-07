@@ -1,0 +1,26 @@
+<article class="event-form card border-secondary-subtle mb-3" data-event-form>
+  <div class="card-body">
+    {{ event_form.id }}{{ event_form.sort_order }}
+    <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+      <h3 class="h6 mb-0">Life event <span data-event-number>{{ event_number }}</span></h3>
+      <div class="btn-group btn-group-sm" role="group" aria-label="Reorder or remove life event">
+        <button class="btn btn-outline-secondary" type="button" data-event-up aria-label="Move life event up"><i class="bi bi-arrow-up"></i></button>
+        <button class="btn btn-outline-secondary" type="button" data-event-down aria-label="Move life event down"><i class="bi bi-arrow-down"></i></button>
+        <button class="btn btn-outline-danger" type="button" data-event-remove>Remove</button>
+      </div>
+    </div>
+    {% if event_form.non_field_errors %}<div class="alert alert-danger py-2">{{ event_form.non_field_errors }}</div>{% endif %}
+    <div class="row g-3">
+      <div class="col-md-8"><label class="form-label" for="{{ event_form.name.id_for_label }}">Name</label>{{ event_form.name }}{{ event_form.name.errors }}</div>
+      <div class="col-md-4"><label class="form-label" for="{{ event_form.category.id_for_label }}">Category</label>{{ event_form.category }}{{ event_form.category.errors }}</div>
+      <div class="col-md-4"><label class="form-label" for="{{ event_form.event_date.id_for_label }}">Event date</label>{{ event_form.event_date }}{{ event_form.event_date.errors }}</div>
+      <div class="col-md-4"><label class="form-label" for="{{ event_form.one_time_amount.id_for_label }}">One-time amount (IDR)</label>{{ event_form.one_time_amount }}{{ event_form.one_time_amount.errors }}</div>
+      <div class="col-md-4"><label class="form-label" for="{{ event_form.amount_basis.id_for_label }}">Amount basis</label>{{ event_form.amount_basis }}{{ event_form.amount_basis.errors }}</div>
+      <div class="col-md-4"><label class="form-label" for="{{ event_form.recurring_monthly_amount.id_for_label }}">Temporary monthly amount</label>{{ event_form.recurring_monthly_amount }}{{ event_form.recurring_monthly_amount.errors }}</div>
+      <div class="col-md-4"><label class="form-label" for="{{ event_form.recurring_end_date.id_for_label }}">Recurring end date</label>{{ event_form.recurring_end_date }}{{ event_form.recurring_end_date.errors }}<div class="form-text">The end month is included.</div></div>
+      <div class="col-md-4"><label class="form-label" for="{{ event_form.funding_source.id_for_label }}">Funding source</label>{{ event_form.funding_source }}{{ event_form.funding_source.errors }}</div>
+      <div class="col-12"><label class="form-label" for="{{ event_form.notes.id_for_label }}">Notes <span class="text-muted">(optional)</span></label>{{ event_form.notes }}{{ event_form.notes.errors }}</div>
+      <div class="col-12 event-delete-control">{{ event_form.DELETE }} <label for="{{ event_form.DELETE.id_for_label }}">Remove this event when recalculating</label></div>
+    </div>
+  </div>
+</article>
