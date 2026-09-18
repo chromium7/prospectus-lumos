@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 from django import forms
 from django.utils import timezone
 
 from prospectus_lumos.apps.financial_planning.models import FreedomPlan, FreedomScenario
+from prospectus_lumos.apps.financial_planning.services import ActualsSnapshotService
 
 MONEY_FIELDS = (
     "current_monthly_income",
@@ -213,3 +214,145 @@ class GoalStepForm(forms.ModelForm):
         """Return validated goal fields for a partial draft update."""
 
         return {field_name: self.cleaned_data[field_name] for field_name in self.Meta.fields}
+
+
+class MoneyStepForm(forms.ModelForm):
+    """Collect current finances using labels that do not assume financial knowledge."""
+
+    MONEY_FIELDS = (
+        "current_monthly_income",
+        "current_monthly_expenses",
+        "current_monthly_investment",
+        "current_investable_assets",
+        "emergency_savings",
+    )
+    SOURCE_FIELDS = (
+        "source_mode",
+        "source_period_start",
+        "source_period_end",
+        "source_month_count",
+        "source_excluded_income_categories",
+        "source_excluded_expense_categories",
+    )
+
+    class Meta:
+        model = FreedomScenario
+        fields = (
+            "source_mode",
+            "source_period_start",
+            "source_period_end",
+            "source_month_count",
+            "source_excluded_income_categories",
+            "source_excluded_expense_categories",
+            "current_monthly_income",
+            "current_monthly_expenses",
+            "current_monthly_investment",
+            "current_investable_assets",
+            "emergency_savings",
+        )
+        widgets = {
+            **{
+                field_name: forms.HiddenInput()
+                for field_name in (
+                    "source_mode",
+                    "source_period_start",
+                    "source_period_end",
+                    "source_month_count",
+                    "source_excluded_income_categories",
+                    "source_excluded_expense_categories",
+                )
+            },
+            **{
+                field_name: forms.NumberInput(attrs={"class": "form-control", "inputmode": "decimal", "min": "0"})
+                for field_name in (
+                    "current_monthly_income",
+                    "current_monthly_expenses",
+                    "current_monthly_investment",
+                    "current_investable_assets",
+                    "emergency_savings",
+                )
+            },
+        }
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        for field_name in self.SOURCE_FIELDS:
+            self.fields[field_name].required = False
+
+    def clean(self) -> dict[str, Any]:
+        cleaned_data = super().clean()
+        cleaned_data["source_mode"] = cleaned_data.get("source_mode") or FreedomScenario.SourceMode.MANUAL
+        cleaned_data["source_month_count"] = cleaned_data.get("source_month_count") or 0
+        cleaned_data["source_excluded_income_categories"] = cleaned_data.get("source_excluded_income_categories") or []
+        cleaned_data["source_excluded_expense_categories"] = (
+            cleaned_data.get("source_excluded_expense_categories") or []
+        )
+        if self.errors:
+            return cleaned_data
+        for field_name in self.MONEY_FIELDS:
+            if cleaned_data[field_name] < 0:
+                self.add_error(
+                    field_name,
+                    forms.ValidationError("Enter zero or a positive amount.", code="negative_money"),
+                )
+        return cleaned_data
+
+    def scenario_values(self) -> dict[str, Any]:
+        """Return validated money and source fields for a partial draft update."""
+
+        return {field_name: self.cleaned_data[field_name] for field_name in self.Meta.fields}
+
+
+class ActualsSnapshotForm(forms.Form):
+    """Select an owned tracked-finance period and optional category exclusions."""
+
+    period = forms.ChoiceField(
+        label="How much history should we use?",
+        choices=(
+            ("3m", "Latest 3 complete months"),
+            ("6m", "Latest 6 complete months"),
+            ("12m", "Latest 12 complete months"),
+            ("custom", "Choose a year range"),
+        ),
+        initial="12m",
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    start_year = forms.IntegerField(required=False, widget=forms.NumberInput(attrs={"class": "form-control"}))
+    end_year = forms.IntegerField(required=False, widget=forms.NumberInput(attrs={"class": "form-control"}))
+    excluded_income_categories = forms.MultipleChoiceField(required=False, widget=forms.CheckboxSelectMultiple)
+    excluded_expense_categories = forms.MultipleChoiceField(required=False, widget=forms.CheckboxSelectMultiple)
+
+    def __init__(self, *args: Any, user: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        categories = ActualsSnapshotService(user=user).available_categories()
+        income_field = cast(forms.MultipleChoiceField, self.fields["excluded_income_categories"])
+        expense_field = cast(forms.MultipleChoiceField, self.fields["excluded_expense_categories"])
+        income_field.choices = [(value, value) for value in categories["income"]]
+        expense_field.choices = [(value, value) for value in categories["expense"]]
+        current_year = timezone.localdate().year
+        self.fields["start_year"].widget.attrs.update({"min": 2000, "max": current_year})
+        self.fields["end_year"].widget.attrs.update({"min": 2000, "max": current_year})
+
+    def clean(self) -> dict[str, Any]:
+        cleaned_data = super().clean()
+        if self.errors:
+            return cleaned_data
+        if cleaned_data["period"] == "custom":
+            start = cleaned_data.get("start_year")
+            end = cleaned_data.get("end_year")
+            if start is None or end is None:
+                raise forms.ValidationError("Choose both years for a custom range.", code="custom_years_required")
+            if start > end:
+                raise forms.ValidationError("The start year cannot be after the end year.", code="invalid_year_range")
+        return cleaned_data
+
+    def snapshot_options(self) -> dict[str, Any]:
+        """Return validated keyword arguments for the snapshot service."""
+
+        return {
+            "period": self.cleaned_data["period"],
+            "custom_start_year": self.cleaned_data.get("start_year"),
+            "custom_end_year": self.cleaned_data.get("end_year"),
+            "excluded_income_categories": self.cleaned_data["excluded_income_categories"],
+            "excluded_expense_categories": self.cleaned_data["excluded_expense_categories"],
+        }
