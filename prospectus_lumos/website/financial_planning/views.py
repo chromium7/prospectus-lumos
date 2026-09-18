@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import cast
 from urllib.parse import urlencode
 
 from django.contrib import messages
@@ -19,7 +20,17 @@ from prospectus_lumos.apps.financial_planning.services import (
 )
 from prospectus_lumos.core.utils import TypedHttpRequest
 
-from .forms import ActualsSnapshotForm, FreedomPlanForm, FreedomScenarioForm, GoalStepForm, MoneyStepForm
+from .forms import (
+    EVENT_PRESETS,
+    ActualsSnapshotForm,
+    BaseFinancialEventFormSet,
+    FinancialEventFormSet,
+    FreedomPlanForm,
+    FreedomScenarioForm,
+    GoalStepForm,
+    MoneyStepForm,
+    event_formset_values,
+)
 
 WIZARD_STEPS = ((1, "Your goal"), (2, "Your money"), (3, "Life events"), (4, "Review"))
 
@@ -49,6 +60,22 @@ def _actuals_form_from_query(request: TypedHttpRequest) -> tuple[ActualsSnapshot
     }
     form = ActualsSnapshotForm(query_data, user=request.user)
     return form, _snapshot_from_form(request, form)
+
+
+def _event_formset(
+    request: TypedHttpRequest,
+    *,
+    draft: FreedomScenario,
+) -> BaseFinancialEventFormSet:
+    return cast(
+        BaseFinancialEventFormSet,
+        FinancialEventFormSet(
+            request.POST or None,
+            instance=draft,
+            prefix="events",
+            calculation_date=draft.calculation_date,
+        ),
+    )
 
 
 def _owned_plan(request: TypedHttpRequest, plan_id: int) -> FreedomPlan:
@@ -209,7 +236,7 @@ def plan_money_view(request: TypedHttpRequest, plan_id: int) -> HttpResponse:
             scenario_data=money_form.scenario_values(),
         )
         messages.success(request, "Your current money picture is saved.")
-        return redirect("freedom_plan_draft", plan_id=plan.pk)
+        return redirect("freedom_plan_events", plan_id=plan.pk)
     return render(
         request,
         "financial_planning/wizard_money.html",
@@ -220,6 +247,41 @@ def plan_money_view(request: TypedHttpRequest, plan_id: int) -> HttpResponse:
             "actuals_form": actuals_form,
             "actuals_snapshot": actuals_snapshot,
             "current_step": 2,
+            "wizard_steps": WIZARD_STEPS,
+            "selected_tab": "financial_freedom",
+        },
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def plan_events_view(request: TypedHttpRequest, plan_id: int) -> HttpResponse:
+    """Collect optional future plans without requiring investing terminology."""
+
+    plan = _owned_plan(request, plan_id)
+    draft = get_object_or_404(FreedomScenario, plan=plan, status=FreedomScenario.Status.DRAFT)
+    event_formset = _event_formset(request, draft=draft)
+    if request.method == "POST" and request.POST.get("action") == "skip_events":
+        messages.info(request, "No life events added. You can return to this step later.")
+        return redirect("freedom_plan_draft", plan_id=plan.pk)
+    if request.method == "POST" and event_formset.is_valid():
+        FreedomScenarioService().update_draft(
+            user=request.user,
+            draft=draft,
+            scenario_data={},
+            events=event_formset_values(event_formset),
+        )
+        messages.success(request, "Your future plans are included in the estimate.")
+        return redirect("freedom_plan_draft", plan_id=plan.pk)
+    return render(
+        request,
+        "financial_planning/wizard_events.html",
+        {
+            "plan": plan,
+            "draft": draft,
+            "event_formset": event_formset,
+            "event_presets": EVENT_PRESETS,
+            "current_step": 3,
             "wizard_steps": WIZARD_STEPS,
             "selected_tab": "financial_freedom",
         },

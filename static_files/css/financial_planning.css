@@ -69,6 +69,14 @@
     color: var(--bs-white);
 }
 
+.event-form {
+    background: var(--bs-tertiary-bg);
+}
+
+.event-delete-control {
+    font-size: .875rem;
+}
+
 @media (max-width: 575.98px) {
     .wizard-step {
         justify-content: center;

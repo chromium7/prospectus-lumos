@@ -10,6 +10,7 @@ from django.utils import timezone
 from prospectus_lumos.apps.accounts.models import DocumentSource
 from prospectus_lumos.apps.documents.models import Document
 from prospectus_lumos.apps.financial_planning.models import FreedomPlan, FreedomScenario
+from prospectus_lumos.website.financial_planning.forms import EVENT_PRESETS
 
 
 def _goal_payload(**overrides: object) -> dict[str, object]:
@@ -42,6 +43,19 @@ def _money_payload(**overrides: object) -> dict[str, object]:
         "emergency_savings": "50000000",
     }
     values.update(overrides)
+    return values
+
+
+def _event_payload(events: list[dict[str, object]], *, initial_forms: int = 0) -> dict[str, object]:
+    values: dict[str, object] = {
+        "events-TOTAL_FORMS": str(len(events)),
+        "events-INITIAL_FORMS": str(initial_forms),
+        "events-MIN_NUM_FORMS": "0",
+        "events-MAX_NUM_FORMS": "50",
+    }
+    for index, event in enumerate(events):
+        for field, value in event.items():
+            values[f"events-{index}-{field}"] = value
     return values
 
 
@@ -104,7 +118,7 @@ class FinancialPlanningWizardTests(TestCase):
         self.assertContains(response, "Estimates are fine")
 
         response = self.client.post(url, _money_payload())
-        self.assertRedirects(response, reverse("freedom_plan_draft", args=(draft.plan_id,)))
+        self.assertRedirects(response, reverse("freedom_plan_events", args=(draft.plan_id,)))
         draft.refresh_from_db()
         self.assertEqual(draft.current_monthly_income, 30000000)
         self.assertEqual(draft.current_monthly_expenses, 15000000)
@@ -151,6 +165,85 @@ class FinancialPlanningWizardTests(TestCase):
         self.assertEqual(draft.source_month_count, 1)
         self.assertEqual(draft.current_monthly_income, 31000000)
         self.assertEqual(draft.current_monthly_expenses, 14000000)
+
+    def test_events_page_uses_presets_and_saves_reorders_and_deletes(self) -> None:
+        self.client.post(reverse("freedom_plan_create"), _goal_payload())
+        draft = FreedomScenario.objects.get(plan__user=self.user)
+        url = reverse("freedom_plan_events", args=(draft.plan_id,))
+        response = self.client.get(url)
+        self.assertContains(response, "What big plans might happen along the way?")
+        self.assertContains(response, "These are editable examples, not recommendations")
+        self.assertEqual(
+            set(EVENT_PRESETS),
+            {"car", "home", "wedding", "education", "business", "medical", "family", "custom"},
+        )
+
+        car: dict[str, object] = {
+            "name": "Car",
+            "category": "car",
+            "event_date": "2030-01-01",
+            "one_time_amount": "300000000",
+            "amount_basis": "today",
+            "recurring_monthly_amount": "5000000",
+            "recurring_end_date": "2032-12-01",
+            "funding_source": "investment_portfolio",
+            "sort_order": "0",
+            "notes": "Editable preset",
+        }
+        home: dict[str, object] = {
+            "name": "Home deposit",
+            "category": "home",
+            "event_date": "2031-01-01",
+            "one_time_amount": "500000000",
+            "amount_basis": "today",
+            "recurring_monthly_amount": "0",
+            "recurring_end_date": "",
+            "funding_source": "separate_savings",
+            "sort_order": "1",
+            "notes": "",
+        }
+        response = self.client.post(url, _event_payload([car, home]))
+        self.assertRedirects(response, reverse("freedom_plan_draft", args=(draft.plan_id,)))
+        draft.refresh_from_db()
+        self.assertEqual(list(draft.events.values_list("name", flat=True)), ["Car", "Home deposit"])
+        self.assertEqual(len(draft.projection_data["separate_savings"]), 1)
+
+        current = list(draft.events.order_by("sort_order"))
+        car.update({"id": current[0].pk, "sort_order": "1"})
+        home.update({"id": current[1].pk, "sort_order": "0"})
+        self.client.post(url, _event_payload([car, home], initial_forms=2))
+        self.assertEqual(list(draft.events.values_list("name", flat=True)), ["Home deposit", "Car"])
+
+        current = list(draft.events.order_by("sort_order"))
+        delete_home = {**home, "id": current[0].pk, "sort_order": "0", "DELETE": "on"}
+        keep_car = {**car, "id": current[1].pk, "sort_order": "1"}
+        self.client.post(url, _event_payload([delete_home, keep_car], initial_forms=2))
+        self.assertEqual(list(draft.events.values_list("name", flat=True)), ["Car"])
+
+    def test_events_page_preserves_invalid_rows_and_allows_skipping(self) -> None:
+        self.client.post(reverse("freedom_plan_create"), _goal_payload())
+        draft = FreedomScenario.objects.get(plan__user=self.user)
+        url = reverse("freedom_plan_events", args=(draft.plan_id,))
+        invalid: dict[str, object] = {
+            "name": "Keep this answer",
+            "category": "custom",
+            "event_date": "2025-01-01",
+            "one_time_amount": "0",
+            "amount_basis": "today",
+            "recurring_monthly_amount": "0",
+            "recurring_end_date": "",
+            "funding_source": "separate_savings",
+            "sort_order": "0",
+            "notes": "",
+        }
+        response = self.client.post(url, _event_payload([invalid]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Keep this answer")
+        self.assertContains(response, "Enter a one-time amount or a monthly amount")
+        self.assertFalse(draft.events.exists())
+
+        response = self.client.post(url, {"action": "skip_events"})
+        self.assertRedirects(response, reverse("freedom_plan_draft", args=(draft.plan_id,)))
 
     def test_portfolio_analyzer_links_its_owned_period_into_the_wizard(self) -> None:
         response = self.client.get(reverse("portfolio_analyzer") + "?year_from=2025&year_to=2026")
