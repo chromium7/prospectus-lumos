@@ -553,3 +553,68 @@ def event_formset_values(formset: BaseFinancialEventFormSet) -> list[dict[str, A
         }
         for sort_order, row in enumerate(rows)
     ]
+
+
+class ReviewStepForm(forms.ModelForm):
+    """Expose calculator assumptions as optional, explained review controls."""
+
+    class Meta:
+        model = FreedomScenario
+        fields = (
+            "withdrawal_rate",
+            "annual_return_rate",
+            "annual_inflation_rate",
+            "annual_income_growth_rate",
+            "annual_contribution_growth_rate",
+            "safety_buffer_rate",
+            "include_emergency_reserve_in_target",
+        )
+        widgets = {
+            **{
+                field_name: forms.NumberInput(attrs={"class": "form-control", "inputmode": "decimal", "step": "0.1"})
+                for field_name in (
+                    "withdrawal_rate",
+                    "annual_return_rate",
+                    "annual_inflation_rate",
+                    "annual_income_growth_rate",
+                    "annual_contribution_growth_rate",
+                    "safety_buffer_rate",
+                )
+            },
+            "include_emergency_reserve_in_target": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
+
+    def clean(self) -> dict[str, Any]:
+        cleaned_data = super().clean()
+        if self.errors:
+            return cleaned_data
+        withdrawal_rate = cleaned_data["withdrawal_rate"]
+        if not Decimal("0") < withdrawal_rate <= Decimal("10"):
+            self.add_error(
+                "withdrawal_rate",
+                forms.ValidationError("Choose a value above 0% and no more than 10%.", code="rate_range"),
+            )
+        safety_buffer_rate = cleaned_data["safety_buffer_rate"]
+        if not Decimal("0") <= safety_buffer_rate <= Decimal("100"):
+            self.add_error(
+                "safety_buffer_rate",
+                forms.ValidationError("Choose a cushion from 0% to 100%.", code="rate_range"),
+            )
+        for field_name in (
+            "annual_return_rate",
+            "annual_inflation_rate",
+            "annual_income_growth_rate",
+            "annual_contribution_growth_rate",
+        ):
+            value = cleaned_data[field_name]
+            if not Decimal("-99") <= value <= Decimal("100"):
+                self.add_error(
+                    field_name,
+                    forms.ValidationError("Choose a yearly rate from -99% to 100%.", code="rate_range"),
+                )
+        return cleaned_data
+
+    def scenario_values(self) -> dict[str, Any]:
+        """Return validated assumptions for update or transient preview."""
+
+        return {field_name: self.cleaned_data[field_name] for field_name in self.Meta.fields}

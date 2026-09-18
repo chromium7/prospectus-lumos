@@ -34,6 +34,34 @@
     max-width: 54rem;
 }
 
+.wizard-review-shell {
+    margin: 0 auto;
+    max-width: 72rem;
+}
+
+.wizard-review-layout {
+    display: grid;
+    gap: 1.5rem;
+    grid-template-columns: minmax(0, 2fr) minmax(18rem, 1fr);
+}
+
+.planner-summary {
+    align-self: start;
+    position: sticky;
+    top: 1rem;
+}
+
+.summary-label {
+    color: var(--bs-secondary-color);
+    font-size: .85rem;
+    margin-bottom: .1rem;
+}
+
+.summary-value {
+    font-size: 1.35rem;
+    font-weight: 700;
+}
+
 .wizard-steps {
     display: grid;
     gap: .5rem;
@@ -84,6 +112,18 @@
 
     .wizard-step > span:last-child {
         display: none;
+    }
+}
+
+@media (max-width: 991.98px) {
+    .wizard-review-layout {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .planner-summary {
+        order: -1;
+        position: static;
     }
 }
 

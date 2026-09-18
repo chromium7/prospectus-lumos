@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import cast
+from typing import Any, cast
 from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Prefetch
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
@@ -29,6 +29,7 @@ from .forms import (
     FreedomScenarioForm,
     GoalStepForm,
     MoneyStepForm,
+    ReviewStepForm,
     event_formset_values,
 )
 
@@ -79,6 +80,49 @@ def _event_formset(
     if request.method == "GET" and draft.events.exists():
         formset.extra = 0
     return formset
+
+
+def _preview_scenario_values(draft: FreedomScenario, overrides: dict[str, Any]) -> dict[str, Any]:
+    values = {field_name: getattr(draft, field_name) for field_name in FreedomScenarioForm.Meta.fields}
+    values.update(overrides)
+    return values
+
+
+def _preview_event_values(draft: FreedomScenario) -> list[dict[str, Any]]:
+    return [
+        {
+            "name": event.name,
+            "event_date": event.event_date,
+            "one_time_amount": event.one_time_amount,
+            "recurring_monthly_amount": event.recurring_monthly_amount,
+            "recurring_end_date": event.recurring_end_date,
+            "amount_basis": event.amount_basis,
+            "funding_source": event.funding_source,
+        }
+        for event in draft.events.all()
+    ]
+
+
+def _review_context(
+    *,
+    plan: FreedomPlan,
+    draft: FreedomScenario,
+    review_form: ReviewStepForm,
+) -> dict[str, object]:
+    monthly = draft.projection_data.get("monthly", [])
+    timeline = [row for index, row in enumerate(monthly) if index % 12 == 0 or index == len(monthly) - 1]
+    required = draft.required_monthly_investment or 0
+    return {
+        "plan": plan,
+        "draft": draft,
+        "review_form": review_form,
+        "monthly_increase": max(0, required - draft.current_monthly_investment),
+        "timeline": timeline,
+        "separate_savings": draft.projection_data.get("separate_savings", []),
+        "current_step": 4,
+        "wizard_steps": WIZARD_STEPS,
+        "selected_tab": "financial_freedom",
+    }
 
 
 def _owned_plan(request: TypedHttpRequest, plan_id: int) -> FreedomPlan:
@@ -266,7 +310,7 @@ def plan_events_view(request: TypedHttpRequest, plan_id: int) -> HttpResponse:
     event_formset = _event_formset(request, draft=draft)
     if request.method == "POST" and request.POST.get("action") == "skip_events":
         messages.info(request, "No life events added. You can return to this step later.")
-        return redirect("freedom_plan_draft", plan_id=plan.pk)
+        return redirect("freedom_plan_review", plan_id=plan.pk)
     if request.method == "POST" and event_formset.is_valid():
         FreedomScenarioService().update_draft(
             user=request.user,
@@ -275,7 +319,7 @@ def plan_events_view(request: TypedHttpRequest, plan_id: int) -> HttpResponse:
             events=event_formset_values(event_formset),
         )
         messages.success(request, "Your future plans are included in the estimate.")
-        return redirect("freedom_plan_draft", plan_id=plan.pk)
+        return redirect("freedom_plan_review", plan_id=plan.pk)
     return render(
         request,
         "financial_planning/wizard_events.html",
@@ -288,6 +332,91 @@ def plan_events_view(request: TypedHttpRequest, plan_id: int) -> HttpResponse:
             "wizard_steps": WIZARD_STEPS,
             "selected_tab": "financial_freedom",
         },
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def plan_review_view(request: TypedHttpRequest, plan_id: int) -> HttpResponse:
+    """Explain the estimate and keep technical assumptions optional."""
+
+    plan = _owned_plan(request, plan_id)
+    draft = get_object_or_404(
+        FreedomScenario.objects.prefetch_related("events"),
+        plan=plan,
+        status=FreedomScenario.Status.DRAFT,
+    )
+    review_form = ReviewStepForm(request.POST or None, instance=draft)
+    if request.method == "POST" and review_form.is_valid():
+        FreedomScenarioService().update_draft(
+            user=request.user,
+            draft=draft,
+            scenario_data=review_form.scenario_values(),
+        )
+        messages.success(request, "Estimate updated with your assumptions.")
+        return redirect("freedom_plan_review", plan_id=plan.pk)
+    return render(
+        request,
+        "financial_planning/wizard_review.html",
+        _review_context(plan=plan, draft=draft, review_form=review_form),
+    )
+
+
+@login_required
+@require_POST
+def calculate_preview_view(request: TypedHttpRequest) -> JsonResponse:
+    """Return an owned, server-authoritative preview for review-page assumptions."""
+
+    try:
+        plan_id = int(request.POST.get("plan_id", ""))
+    except ValueError:
+        return JsonResponse({"ok": False, "errors": {"plan_id": ["Invalid plan."]}}, status=400)
+    plan = _owned_plan(request, plan_id)
+    draft = get_object_or_404(
+        FreedomScenario.objects.prefetch_related("events"),
+        plan=plan,
+        status=FreedomScenario.Status.DRAFT,
+    )
+    form = ReviewStepForm(request.POST, instance=draft)
+    request_id = request.POST.get("preview_request_id", "")[:64]
+    if not form.is_valid():
+        return JsonResponse(
+            {"ok": False, "request_id": request_id, "errors": {"scenario": form.errors.get_json_data()}},
+            status=400,
+        )
+    result = FreedomScenarioService().calculate_preview(
+        scenario_data=_preview_scenario_values(draft, form.scenario_values()),
+        events=_preview_event_values(draft),
+    )
+    payload = cast(dict[str, Any], result.to_payload())
+    base_case = payload["cases"]["base"]
+    return JsonResponse(
+        {
+            "ok": True,
+            "request_id": request_id,
+            "schema_version": payload["schema_version"],
+            "calculation_version": payload["calculation_version"],
+            "summary": {
+                "base_freedom_number": payload["target_breakdown"]["base_freedom_number_today"],
+                "total_target": payload["target_breakdown"]["total_target"],
+                "required_monthly_investment": base_case["required_contribution"]["monthly_contribution"],
+                "projected_achievement_date": base_case["achievement"]["date"],
+                "funding_gap": payload["funding_gap"],
+                "progress_percent": payload["progress_percent"],
+                "status": payload["status"],
+            },
+            "timeline": [
+                {
+                    "date": row["date"],
+                    "closing_balance": row["closing_balance"],
+                    "target": row["target"],
+                    "event_outflow": row["event_outflow"],
+                }
+                for row in payload["monthly"]
+            ],
+            "separate_savings": payload["separate_savings"],
+            "warnings": payload["warnings"],
+        }
     )
 
 
@@ -319,7 +448,7 @@ def plan_save_view(request: TypedHttpRequest, plan_id: int) -> HttpResponse:
 
     plan = _owned_plan(request, plan_id)
     draft = get_object_or_404(FreedomScenario, plan=plan, status=FreedomScenario.Status.DRAFT)
-    if request.POST:
+    if "target_date" in request.POST:
         form = FreedomScenarioForm(request.POST, instance=draft)
         if not form.is_valid():
             return render(
@@ -363,7 +492,7 @@ def scenario_update_view(request: TypedHttpRequest, plan_id: int, scenario_id: i
         messages.info(request, "This plan already has an editable draft.")
         return redirect("freedom_plan_draft", plan_id=plan_id)
     messages.success(request, f"Created an editable draft based on version {scenario.version}.")
-    return redirect("freedom_plan_draft", plan_id=draft.plan_id)
+    return redirect("freedom_plan_review", plan_id=draft.plan_id)
 
 
 @login_required
@@ -375,7 +504,7 @@ def scenario_duplicate_view(request: TypedHttpRequest, plan_id: int, scenario_id
     name = request.POST.get("name", "").strip() or None
     draft = FreedomScenarioService().duplicate_to_new_plan(user=request.user, scenario=scenario, name=name)
     messages.success(request, "Scenario duplicated into a new editable plan.")
-    return redirect("freedom_plan_draft", plan_id=draft.plan_id)
+    return redirect("freedom_plan_review", plan_id=draft.plan_id)
 
 
 @login_required
