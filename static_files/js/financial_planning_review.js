@@ -24,7 +24,7 @@
     function updateTimeline(timeline) {
         const body = document.querySelector("[data-preview-timeline]");
         if (!body) return;
-        const checkpoints = timeline.filter((row, index) => index % 12 === 0 || index === timeline.length - 1);
+        const checkpoints = timeline.filter((row, index) => index % 60 === 0 || index === timeline.length - 1);
         body.replaceChildren(...checkpoints.map((row) => {
             const tr = document.createElement("tr");
             const year = document.createElement("td");

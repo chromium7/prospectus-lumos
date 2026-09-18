@@ -110,7 +110,7 @@ def _review_context(
     review_form: ReviewStepForm,
 ) -> dict[str, object]:
     monthly = draft.projection_data.get("monthly", [])
-    timeline = [row for index, row in enumerate(monthly) if index % 12 == 0 or index == len(monthly) - 1]
+    timeline = [row for index, row in enumerate(monthly) if index % 60 == 0 or index == len(monthly) - 1]
     required = draft.required_monthly_investment or 0
     return {
         "plan": plan,
