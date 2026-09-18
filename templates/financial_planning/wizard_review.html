@@ -38,7 +38,7 @@
 
       <section class="card shadow-sm mb-4"><div class="card-body p-4">
         <h2 class="h5">How the investment could grow</h2>
-        <p class="small text-muted">Yearly checkpoints based on the assumptions below. Real markets will not move this smoothly.</p>
+        <p class="small text-muted">Five-year checkpoints based on the assumptions below. Real markets will not move this smoothly.</p>
         <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Year</th><th class="text-end">Estimated investments</th><th class="text-end">Target at that time</th></tr></thead><tbody data-preview-timeline>{% for row in timeline %}<tr><td>{{ row.date|slice:":4" }}</td><td class="text-end">{{ row.closing_balance|idr }}</td><td class="text-end">{{ row.target|idr }}</td></tr>{% empty %}<tr><td colspan="3">No timeline is available.</td></tr>{% endfor %}</tbody></table></div>
       </div></section>
 
