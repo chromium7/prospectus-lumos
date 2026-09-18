@@ -207,6 +207,8 @@ class FinancialPlanningWizardTests(TestCase):
         draft.refresh_from_db()
         self.assertEqual(list(draft.events.values_list("name", flat=True)), ["Car", "Home deposit"])
         self.assertEqual(len(draft.projection_data["separate_savings"]), 1)
+        response = self.client.get(url)
+        self.assertEqual(response.context["event_formset"].total_form_count(), 2)
 
         current = list(draft.events.order_by("sort_order"))
         car.update({"id": current[0].pk, "sort_order": "1"})

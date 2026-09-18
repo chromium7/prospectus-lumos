@@ -67,7 +67,7 @@ def _event_formset(
     *,
     draft: FreedomScenario,
 ) -> BaseFinancialEventFormSet:
-    return cast(
+    formset = cast(
         BaseFinancialEventFormSet,
         FinancialEventFormSet(
             request.POST or None,
@@ -76,6 +76,9 @@ def _event_formset(
             calculation_date=draft.calculation_date,
         ),
     )
+    if request.method == "GET" and draft.events.exists():
+        formset.extra = 0
+    return formset
 
 
 def _owned_plan(request: TypedHttpRequest, plan_id: int) -> FreedomPlan:
