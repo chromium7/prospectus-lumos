@@ -1,18 +1,25 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from decimal import Decimal
+from dataclasses import dataclass
+from datetime import date
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Max
+from django.db.models import Max, Q, QuerySet
 from django.utils import timezone
+
+from prospectus_lumos.apps.documents.models import Document
+from prospectus_lumos.apps.expenses.services import ExpenseAnalyzerService
+from prospectus_lumos.apps.transactions.models import Transaction
 
 from .calculator import (
     CALCULATION_VERSION,
     AmountBasis,
+    CalculationResult,
     CalculatorInputs,
     EventInput,
     FinancialFreedomCalculator,
@@ -59,6 +66,191 @@ EVENT_FIELDS = (
     "notes",
 )
 
+ACTUALS_PERIOD_MONTHS = {"3m": 3, "6m": 6, "12m": 12}
+MONEY_QUANTUM = Decimal("0.01")
+
+
+@dataclass(frozen=True, slots=True)
+class ActualsSnapshot:
+    """An owned, dated cash-flow suggestion ready to copy into a draft."""
+
+    period: str
+    snapshot_date: date
+    source_period_start: date | None
+    source_period_end: date | None
+    represented_months: tuple[str, ...]
+    missing_months: tuple[str, ...]
+    total_income: Decimal
+    total_expenses: Decimal
+    average_income: Decimal
+    average_expenses: Decimal
+    average_net_savings: Decimal
+    income_categories: tuple[str, ...]
+    expense_categories: tuple[str, ...]
+    excluded_income_categories: tuple[str, ...]
+    excluded_expense_categories: tuple[str, ...]
+    warnings: tuple[str, ...]
+
+    @property
+    def month_count(self) -> int:
+        """Return the number of represented complete months used as denominator."""
+
+        return len(self.represented_months)
+
+    def scenario_values(self) -> dict[str, object]:
+        """Return editable suggestions plus frozen source metadata."""
+
+        return {
+            "source_mode": FreedomScenario.SourceMode.TRACKED_ACTUALS,
+            "source_period_start": self.source_period_start,
+            "source_period_end": self.source_period_end,
+            "source_month_count": self.month_count,
+            "source_excluded_income_categories": list(self.excluded_income_categories),
+            "source_excluded_expense_categories": list(self.excluded_expense_categories),
+            "current_monthly_income": self.average_income,
+            "current_monthly_expenses": self.average_expenses,
+            "current_monthly_investment": max(Decimal("0"), self.average_net_savings),
+            "desired_monthly_lifestyle": self.average_expenses,
+        }
+
+    def to_payload(self) -> dict[str, object]:
+        """Return a JSON-safe preview payload with money encoded as strings."""
+
+        return {
+            "period": self.period,
+            "snapshot_date": self.snapshot_date.isoformat(),
+            "source_period_start": self.source_period_start.isoformat() if self.source_period_start else None,
+            "source_period_end": self.source_period_end.isoformat() if self.source_period_end else None,
+            "month_count": self.month_count,
+            "represented_months": list(self.represented_months),
+            "missing_months": list(self.missing_months),
+            "total_income": _money(self.total_income),
+            "total_expenses": _money(self.total_expenses),
+            "average_income": _money(self.average_income),
+            "average_expenses": _money(self.average_expenses),
+            "average_net_savings": _money(self.average_net_savings),
+            "income_categories": list(self.income_categories),
+            "expense_categories": list(self.expense_categories),
+            "excluded_income_categories": list(self.excluded_income_categories),
+            "excluded_expense_categories": list(self.excluded_expense_categories),
+            "warnings": list(self.warnings),
+        }
+
+
+class ActualsSnapshotService:
+    """Build user-scoped cash-flow averages from represented complete months."""
+
+    def __init__(self, *, user: User, snapshot_date: date | None = None) -> None:
+        self.user = user
+        self.snapshot_date = snapshot_date or timezone.localdate()
+
+    def available_categories(self) -> dict[str, tuple[str, ...]]:
+        """Return distinct owned income and expense categories for exclusion controls."""
+
+        rows = Transaction.objects.filter(document__user=self.user).values_list("transaction_type", "category")
+        categories: dict[str, set[str]] = {"income": set(), "expense": set()}
+        for transaction_type, raw_category in rows:
+            categories[transaction_type].add(raw_category or "Uncategorized")
+        return {key: tuple(sorted(values)) for key, values in categories.items()}
+
+    def create_snapshot(
+        self,
+        *,
+        period: str,
+        custom_start_year: int | None = None,
+        custom_end_year: int | None = None,
+        excluded_income_categories: Sequence[str] = (),
+        excluded_expense_categories: Sequence[str] = (),
+    ) -> ActualsSnapshot:
+        """Create a snapshot using actual represented months, never transaction count."""
+
+        if period not in (*ACTUALS_PERIOD_MONTHS, "custom"):
+            raise ValidationError("Choose a supported actuals period.")
+        documents = list(self._complete_documents())
+        requested_months: int | None = ACTUALS_PERIOD_MONTHS.get(period)
+        source_start: date | None = None
+        source_end: date | None = None
+        if period == "custom":
+            if custom_start_year is None or custom_end_year is None or custom_start_year > custom_end_year:
+                raise ValidationError("Choose a valid custom year range.")
+            source_start = date(custom_start_year, 1, 1)
+            source_end = min(date(custom_end_year, 12, 1), _add_months(self.snapshot_date.replace(day=1), -1))
+            documents = [document for document in documents if custom_start_year <= document.year <= custom_end_year]
+        elif documents:
+            source_end = _document_month(documents[-1])
+            source_start = _add_months(source_end, -(requested_months - 1))
+            documents = [document for document in documents if source_start <= _document_month(document) <= source_end]
+
+        represented = tuple(_document_month(document) for document in documents)
+        represented_labels = tuple(month.strftime("%Y-%m") for month in represented)
+        missing = self._missing_months(source_start, source_end, represented) if represented else ()
+        categories = self.available_categories()
+        excluded_income = tuple(sorted(set(excluded_income_categories) & set(categories["income"])))
+        excluded_expenses = tuple(sorted(set(excluded_expense_categories) & set(categories["expense"])))
+        analysis = ExpenseAnalyzerService(self.user).get_document_cashflow_analysis(
+            document_ids=[document.pk for document in documents],
+            exclude_income_categories=list(excluded_income),
+            exclude_expense_categories=list(excluded_expenses),
+        )
+        total_income = Decimal(analysis["total_income"])
+        total_expenses = Decimal(analysis["total_expenses"])
+        denominator = Decimal(len(documents)) if documents else Decimal("1")
+        average_income = (total_income / denominator).quantize(MONEY_QUANTUM, rounding=ROUND_HALF_UP)
+        average_expenses = (total_expenses / denominator).quantize(MONEY_QUANTUM, rounding=ROUND_HALF_UP)
+        warnings: list[str] = []
+        if not documents:
+            warnings.append("No complete tracked months are available; manual planning remains available.")
+        if requested_months is not None and len(documents) < requested_months:
+            warnings.append(
+                f"Requested {requested_months} months; the estimate uses "
+                f"{len(documents)} represented complete month(s)."
+            )
+        if missing:
+            warnings.append(
+                f"Missing represented calendar months: {', '.join(missing)}. They were not treated as zero."
+            )
+        if average_expenses > average_income:
+            warnings.append("Average tracked expenses exceed average tracked income for this source period.")
+        return ActualsSnapshot(
+            period=period,
+            snapshot_date=self.snapshot_date,
+            source_period_start=source_start,
+            source_period_end=source_end,
+            represented_months=represented_labels,
+            missing_months=missing,
+            total_income=total_income,
+            total_expenses=total_expenses,
+            average_income=average_income,
+            average_expenses=average_expenses,
+            average_net_savings=average_income - average_expenses,
+            income_categories=categories["income"],
+            expense_categories=categories["expense"],
+            excluded_income_categories=excluded_income,
+            excluded_expense_categories=excluded_expenses,
+            warnings=tuple(warnings),
+        )
+
+    def _complete_documents(self) -> QuerySet[Document]:
+        current_month = self.snapshot_date.replace(day=1)
+        return (
+            Document.objects.filter(user=self.user)
+            .filter(Q(year__lt=current_month.year) | Q(year=current_month.year, month__lt=current_month.month))
+            .order_by("year", "month")
+        )
+
+    @staticmethod
+    def _missing_months(start: date | None, end: date | None, represented: Sequence[date]) -> tuple[str, ...]:
+        if start is None or end is None:
+            return ()
+        represented_set = set(represented)
+        missing: list[str] = []
+        cursor = start
+        while cursor <= end:
+            if cursor not in represented_set:
+                missing.append(cursor.strftime("%Y-%m"))
+            cursor = _add_months(cursor, 1)
+        return tuple(missing)
+
 
 class ImmutableScenarioError(ValidationError):
     """Raised when a caller attempts to mutate a saved scenario."""
@@ -73,6 +265,46 @@ class FreedomScenarioService:
 
     def __init__(self, calculator: FinancialFreedomCalculator | None = None) -> None:
         self.calculator = calculator or FinancialFreedomCalculator()
+
+    def calculate_preview(
+        self,
+        *,
+        scenario_data: Mapping[str, Any],
+        events: Sequence[Mapping[str, Any]] = (),
+    ) -> CalculationResult:
+        """Calculate validated transient inputs without writing a scenario."""
+
+        calculator_inputs = CalculatorInputs(
+            calculation_date=scenario_data["calculation_date"],
+            target_date=scenario_data["target_date"],
+            desired_monthly_lifestyle=scenario_data["desired_monthly_lifestyle"],
+            current_investable_assets=scenario_data["current_investable_assets"],
+            current_monthly_investment=scenario_data["current_monthly_investment"],
+            current_monthly_income=scenario_data["current_monthly_income"],
+            current_monthly_expenses=scenario_data["current_monthly_expenses"],
+            post_freedom_monthly_income=scenario_data["post_freedom_monthly_income"],
+            emergency_savings=scenario_data["emergency_savings"],
+            withdrawal_rate=scenario_data["withdrawal_rate"],
+            annual_return_rate=scenario_data["annual_return_rate"],
+            annual_inflation_rate=scenario_data["annual_inflation_rate"],
+            annual_income_growth_rate=scenario_data["annual_income_growth_rate"],
+            annual_contribution_growth_rate=scenario_data["annual_contribution_growth_rate"],
+            safety_buffer_rate=scenario_data["safety_buffer_rate"],
+            include_emergency_reserve_in_target=scenario_data["include_emergency_reserve_in_target"],
+        )
+        event_inputs = tuple(
+            EventInput(
+                name=event["name"],
+                event_date=event["event_date"],
+                one_time_amount=event.get("one_time_amount", Decimal("0")),
+                recurring_monthly_amount=event.get("recurring_monthly_amount", Decimal("0")),
+                recurring_end_date=event.get("recurring_end_date"),
+                amount_basis=AmountBasis(event.get("amount_basis", AmountBasis.TODAY)),
+                funding_source=FundingSource(event.get("funding_source", FundingSource.INVESTMENT_PORTFOLIO)),
+            )
+            for event in events
+        )
+        return self.calculator.calculate(calculator_inputs, event_inputs)
 
     @transaction.atomic
     def create_plan_with_draft(
@@ -316,3 +548,16 @@ class FreedomScenarioService:
             "result_status",
             "projection_data",
         )
+
+
+def _document_month(document: Document) -> date:
+    return date(document.year, document.month, 1)
+
+
+def _add_months(start: date, months: int) -> date:
+    month_number = start.year * 12 + start.month - 1 + months
+    return date(month_number // 12, month_number % 12 + 1, 1)
+
+
+def _money(value: Decimal) -> str:
+    return format(value.quantize(MONEY_QUANTUM, rounding=ROUND_HALF_UP), "f")
