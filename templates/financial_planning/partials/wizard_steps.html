@@ -1,0 +1,8 @@
+<nav class="wizard-steps mb-4" aria-label="Plan creation progress">
+  {% for number, label in wizard_steps %}
+    <div class="wizard-step{% if number == current_step %} is-current{% elif number < current_step %} is-complete{% endif %}"{% if number == current_step %} aria-current="step"{% endif %}>
+      <span class="wizard-step-number">{% if number < current_step %}<i class="bi bi-check-lg" aria-hidden="true"></i>{% else %}{{ number }}{% endif %}</span>
+      <span>{{ label }}</span>
+    </div>
+  {% endfor %}
+</nav>

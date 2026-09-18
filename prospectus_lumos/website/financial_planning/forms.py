@@ -160,3 +160,56 @@ class FreedomScenarioForm(forms.ModelForm):
         """Return only persisted, server-validated input fields."""
 
         return {field_name: self.cleaned_data[field_name] for field_name in self.Meta.fields}
+
+
+class GoalStepForm(forms.ModelForm):
+    """Collect the small set of inputs needed to describe a freedom goal."""
+
+    class Meta:
+        model = FreedomScenario
+        fields = (
+            "calculation_date",
+            "birth_date",
+            "target_date",
+            "desired_monthly_lifestyle",
+            "post_freedom_monthly_income",
+        )
+        widgets = {
+            "calculation_date": forms.HiddenInput(),
+            "birth_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            "target_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            "desired_monthly_lifestyle": forms.NumberInput(
+                attrs={"class": "form-control", "inputmode": "decimal", "min": "0"}
+            ),
+            "post_freedom_monthly_income": forms.NumberInput(
+                attrs={"class": "form-control", "inputmode": "decimal", "min": "0"}
+            ),
+        }
+
+    def clean_birth_date(self) -> date | None:
+        birth_date = self.cleaned_data.get("birth_date")
+        if birth_date and birth_date > timezone.localdate():
+            raise forms.ValidationError("Birth date cannot be in the future.", code="future_birth_date")
+        return birth_date
+
+    def clean(self) -> dict[str, Any]:
+        cleaned_data = super().clean()
+        if self.errors:
+            return cleaned_data
+        if cleaned_data["target_date"] <= cleaned_data["calculation_date"]:
+            self.add_error(
+                "target_date",
+                forms.ValidationError("Choose a date in the future.", code="invalid_target_date"),
+            )
+        for field_name in ("desired_monthly_lifestyle", "post_freedom_monthly_income"):
+            if cleaned_data[field_name] < 0:
+                self.add_error(
+                    field_name,
+                    forms.ValidationError("Enter zero or a positive amount.", code="negative_money"),
+                )
+        return cleaned_data
+
+    def scenario_values(self) -> dict[str, Any]:
+        """Return validated goal fields for a partial draft update."""
+
+        return {field_name: self.cleaned_data[field_name] for field_name in self.Meta.fields}

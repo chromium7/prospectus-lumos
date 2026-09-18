@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Your goal - Prospectus Lumos{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/financial_planning.css' %}">{% endblock %}
+
+{% block content %}
+<div class="wizard-shell">
+  <a class="small text-decoration-none" href="{% url 'freedom_plan_list' %}"><i class="bi bi-arrow-left"></i> All plans</a>
+  <div class="mt-3">{% include "financial_planning/partials/wizard_steps.html" with wizard_steps=wizard_steps %}</div>
+
+  <header class="mb-4">
+    <p class="text-primary fw-semibold mb-2">Step 1 of 4 · Your goal</p>
+    <h1 class="h2 mb-2">What would financial freedom look like for you?</h1>
+    <p class="text-muted mb-0">A rough answer is enough. You can change everything later, and we will explain the numbers as we go.</p>
+  </header>
+
+  <form method="post" class="card shadow-sm" novalidate>
+    {% csrf_token %}
+    {{ goal_form.calculation_date }}
+    <div class="card-body p-4">
+      {% if plan_form.errors or goal_form.errors %}
+        <div class="alert alert-danger" role="alert"><strong>Please check the highlighted answers.</strong>{{ plan_form.non_field_errors }}{{ goal_form.non_field_errors }}</div>
+      {% endif %}
+
+      <div class="mb-4">
+        <label class="form-label fw-semibold" for="{{ plan_form.name.id_for_label }}">Give this plan a name</label>
+        {{ plan_form.name }}{{ plan_form.name.errors }}
+        <div class="form-text">For example, “More choices by age 45” or “A calmer retirement”.</div>
+      </div>
+      <div class="mb-4">
+        <label class="form-label fw-semibold" for="{{ plan_form.description.id_for_label }}">Why is this goal important to you? <span class="text-muted fw-normal">(optional)</span></label>
+        {{ plan_form.description }}{{ plan_form.description.errors }}
+      </div>
+      <div class="row g-4">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold" for="{{ goal_form.target_date.id_for_label }}">When would you like paid work to become optional?</label>
+          {{ goal_form.target_date }}{{ goal_form.target_date.errors }}
+          <div class="form-text">Choose your best estimate. This is a planning date, not a promise.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold" for="{{ goal_form.birth_date.id_for_label }}">When were you born? <span class="text-muted fw-normal">(optional)</span></label>
+          {{ goal_form.birth_date }}{{ goal_form.birth_date.errors }}
+          <div class="form-text">This helps us describe your timeline in years.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold" for="{{ goal_form.desired_monthly_lifestyle.id_for_label }}">How much would you like to spend each month?</label>
+          <div class="input-group"><span class="input-group-text">Rp</span>{{ goal_form.desired_monthly_lifestyle }}</div>{{ goal_form.desired_monthly_lifestyle.errors }}
+          <div class="form-text">Use today’s prices. Think housing, food, transport, fun, and regular bills.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold" for="{{ goal_form.post_freedom_monthly_income.id_for_label }}">Will you still receive monthly income?</label>
+          <div class="input-group"><span class="input-group-text">Rp</span>{{ goal_form.post_freedom_monthly_income }}</div>{{ goal_form.post_freedom_monthly_income.errors }}
+          <div class="form-text">Include pension, rent, or part-time work. Enter 0 if you are unsure.</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-footer bg-body d-flex justify-content-end p-3">
+      <button class="btn btn-primary" type="submit">Continue to your money <i class="bi bi-arrow-right ms-1"></i></button>
+    </div>
+  </form>
+</div>
+{% endblock %}
