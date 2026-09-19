@@ -1,22 +1,195 @@
 {% extends "base.html" %}
-{% load formatting %}
+{% load static formatting %}
 
 {% block title %}{{ plan.name }} version {{ scenario.version }} - Prospectus Lumos{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/financial_planning.css' %}">{% endblock %}
+
 {% block content %}
-<a class="small text-decoration-none" href="{% url 'freedom_plan_list' %}"><i class="bi bi-arrow-left"></i> All plans</a>
-<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mt-2 mb-4"><div><h1 class="h2 mb-1">{{ plan.name }}</h1><p class="text-muted mb-0">Saved version {{ scenario.version }} · {{ scenario.saved_at|date:"j F Y, H:i" }}</p></div><span class="badge text-bg-success"><i class="bi bi-lock-fill me-1"></i>Immutable</span></div>
-<div class="alert alert-info">Based on these assumptions, your target is <strong>{{ scenario.total_target|idr }}</strong> by {{ scenario.target_date|date:"F Y" }}.</div>
-<div class="row g-3 mb-4">
-  <div class="col-md-6 col-xl-3"><div class="card h-100 shadow-sm"><div class="card-body"><div class="text-muted small">Freedom number today</div><div class="h4">{{ scenario.base_freedom_number|idr }}</div></div></div></div>
-  <div class="col-md-6 col-xl-3"><div class="card h-100 shadow-sm"><div class="card-body"><div class="text-muted small">Total target</div><div class="h4">{{ scenario.total_target|idr }}</div></div></div></div>
-  <div class="col-md-6 col-xl-3"><div class="card h-100 shadow-sm"><div class="card-body"><div class="text-muted small">Required monthly investment</div><div class="h4">{% if scenario.required_monthly_investment is not None %}{{ scenario.required_monthly_investment|idr }}{% else %}Outside estimate bounds{% endif %}</div></div></div></div>
-  <div class="col-md-6 col-xl-3"><div class="card h-100 shadow-sm"><div class="card-body"><div class="text-muted small">Current-pace date</div><div class="h4">{{ scenario.projected_achievement_date|date:"M Y"|default:"Not reached" }}</div><div class="small text-muted">Funding gap {{ scenario.funding_gap|idr }}/month</div></div></div></div>
+<div class="result-shell">
+  <a class="small text-decoration-none" href="{% url 'freedom_plan_list' %}"><i class="bi bi-arrow-left"></i> All plans</a>
+
+  <header class="d-flex flex-wrap justify-content-between align-items-start gap-3 mt-2 mb-4">
+    <div>
+      <h1 class="h2 mb-1">{{ plan.name }}</h1>
+      <p class="text-muted mb-0">Saved version {{ scenario.version }} · {{ scenario.saved_at|date:"j F Y, H:i" }}</p>
+    </div>
+    <span class="badge text-bg-secondary align-self-center"><i class="bi bi-lock-fill me-1"></i>Saved and unchangeable</span>
+  </header>
+
+  {# 1 · Plain-language answer #}
+  <section class="card shadow-sm mb-4" aria-labelledby="result-answer">
+    <div class="card-body p-4">
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <span class="badge {{ status_copy.badge }}"><i class="bi {{ status_copy.icon }} me-1"></i>{{ status_copy.label }}</span>
+        <span class="small text-muted">{{ status_copy.detail }}</span>
+      </div>
+      <h2 class="h4 mb-3" id="result-answer">To spend {{ scenario.desired_monthly_lifestyle|idr }} a month from {{ scenario.target_date|date:"F Y" }}, aim for about {{ scenario.total_target|idr }}.</h2>
+      {% if required_monthly_investment is not None %}
+        <p class="mb-2">Investing <strong>{{ required_monthly_investment|idr }} a month</strong> from now is what this estimate suggests. You invest {{ scenario.current_monthly_investment|idr }} a month today{% if monthly_increase %}, so that is {{ monthly_increase|idr }} more{% endif %}.</p>
+      {% else %}
+        <p class="mb-2">No monthly amount inside this estimate's range reaches that target by that date. A later date or a smaller monthly lifestyle usually fixes this.</p>
+      {% endif %}
+      <p class="mb-0 text-muted">At the pace you invest today, you would get there around <strong>{{ scenario.projected_achievement_date|date:"F Y"|default:"a date beyond this projection" }}</strong>.</p>
+      {% if warnings %}
+      <ul class="list-unstyled small mt-3 mb-0">
+        {% for warning in warnings %}<li class="d-flex gap-2 mb-1"><i class="bi bi-info-circle text-warning" aria-hidden="true"></i><span>{{ warning }}</span></li>{% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+  </section>
+
+  {# 2 · Headline result cards #}
+  <div class="row g-3 mb-4">
+    <div class="col-md-6 col-xl-3"><div class="card h-100 shadow-sm"><div class="card-body"><div class="text-muted small">What you need in total</div><div class="h4 mb-0">{{ scenario.total_target|idr }}</div><div class="small text-muted">By {{ scenario.target_date|date:"F Y" }}</div></div></div></div>
+    <div class="col-md-6 col-xl-3"><div class="card h-100 shadow-sm"><div class="card-body"><div class="text-muted small">Suggested each month</div><div class="h4 mb-0">{% if required_monthly_investment is not None %}{{ required_monthly_investment|idr }}{% else %}Out of range{% endif %}</div><div class="small text-muted">You invest {{ scenario.current_monthly_investment|idr }} today</div></div></div></div>
+    <div class="col-md-6 col-xl-3"><div class="card h-100 shadow-sm"><div class="card-body"><div class="text-muted small">At your current pace</div><div class="h4 mb-0">{{ scenario.projected_achievement_date|date:"M Y"|default:"Not reached" }}</div><div class="small text-muted">Shortfall {{ scenario.funding_gap|idr }} a month</div></div></div></div>
+    <div class="col-md-6 col-xl-3"><div class="card h-100 shadow-sm"><div class="card-body"><div class="text-muted small">Progress so far</div><div class="h4 mb-0">{{ scenario.progress_percent|floatformat:"-1" }}%</div><div class="small text-muted">{{ scenario.current_investable_assets|idr }} invested</div></div></div></div>
+  </div>
+
+  {# 4 · Target breakdown #}
+  <section class="card shadow-sm mb-4" aria-labelledby="result-breakdown">
+    <div class="card-body p-4">
+      <h2 class="h5" id="result-breakdown">Where the target comes from</h2>
+      <p class="small text-muted">Each part is added together to reach the total above.</p>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <caption class="small">Parts of the {{ scenario.total_target|idr }} target.</caption>
+          <thead><tr><th scope="col">Part</th><th scope="col" class="text-end">Amount</th></tr></thead>
+          <tbody>
+            {% for row in target_breakdown %}
+            <tr><th scope="row" class="fw-normal">{{ row.label }}<div class="small text-muted">{{ row.explanation }}</div></th><td class="text-end align-top">{{ row.amount|idr }}</td></tr>
+            {% endfor %}
+            <tr class="fw-semibold border-top"><th scope="row">Total target</th><td class="text-end">{{ scenario.total_target|idr }}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  {# 5 · Scenario range #}
+  <section class="card shadow-sm mb-4" aria-labelledby="result-range">
+    <div class="card-body p-4">
+      <h2 class="h5" id="result-range">If things go differently</h2>
+      <p class="small text-muted">Three fixed sets of assumptions. These are illustrations, not odds, and none of them is a prediction.</p>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th scope="col">Situation</th><th scope="col" class="text-end">Yearly growth</th><th scope="col" class="text-end">Target</th><th scope="col" class="text-end">Suggested each month</th></tr></thead>
+          <tbody>
+            {% for case in cases %}
+            <tr{% if case.name == 'base' %} class="table-active"{% endif %}>
+              <th scope="row" class="fw-normal">{{ case.label }}{% if case.name == 'base' %} <span class="badge text-bg-secondary">This version</span>{% endif %}<div class="small text-muted">{{ case.description }}</div></th>
+              <td class="text-end">{{ case.annual_return_rate|floatformat:"-2" }}%</td>
+              <td class="text-end">{{ case.total_target|idr }}</td>
+              <td class="text-end">{% if case.monthly_contribution is not None %}{{ case.monthly_contribution|idr }}{% else %}Out of range{% endif %}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-muted">This saved version has no stored range.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  {# 6 · Life-event schedule #}
+  {% if event_rows %}
+  <section class="card shadow-sm mb-4" aria-labelledby="result-events">
+    <div class="card-body p-4">
+      <h2 class="h5" id="result-events">Plans along the way</h2>
+      <p class="small text-muted">Plans paid from investments lower the money available for your freedom date. Plans you save for separately stay outside this estimate.</p>
+      <ul class="list-group list-group-flush">
+        {% for row in event_rows %}
+        <li class="list-group-item px-0">
+          <div class="d-flex flex-wrap justify-content-between gap-2">
+            <div>
+              <strong>{{ row.event.name }}</strong>
+              <div class="small text-muted">{{ row.event.event_date|date:"F Y" }} · {{ row.funding_label }}</div>
+              <div class="small text-muted">{{ row.effect }}</div>
+              {% if row.separate_need %}<div class="small">Save about {{ row.separate_need.monthly_funding_need|idr }} a month separately until then.</div>{% endif %}
+            </div>
+            <div class="text-end">
+              {% if row.event.one_time_amount %}<div>{{ row.event.one_time_amount|idr }}</div>{% endif %}
+              {% if row.event.recurring_monthly_amount %}<div class="small text-muted">{{ row.event.recurring_monthly_amount|idr }} a month until {{ row.event.recurring_end_date|date:"M Y" }}</div>{% endif %}
+            </div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+  {% endif %}
+
+  {# 7 · Annual milestone table #}
+  <section class="card shadow-sm mb-4" aria-labelledby="result-milestones">
+    <div class="card-body p-4">
+      <h2 class="h5" id="result-milestones">Year by year</h2>
+      <p class="small text-muted">Where this estimate expects your investments to be at the end of each year, next to the target at that time. Real markets will not move this smoothly.</p>
+      <div class="table-responsive result-milestones">
+        <table class="table table-sm align-middle mb-0">
+          <caption class="small">Estimated investments and target for every year up to {{ scenario.target_date|date:"Y" }}.</caption>
+          <thead><tr><th scope="col">Year</th><th scope="col" class="text-end">Estimated investments</th><th scope="col" class="text-end">Target that year</th><th scope="col" class="text-end">Plans paid</th></tr></thead>
+          <tbody>
+            {% for row in annual_rows %}
+            <tr{% if row.is_milestone %} class="fw-semibold"{% endif %}>
+              <th scope="row" class="fw-normal">{{ row.year }}{% if row.reaches_target %} <span class="badge text-bg-success">Target met</span>{% endif %}</th>
+              <td class="text-end">{{ row.closing_balance|idr }}</td>
+              <td class="text-end">{{ row.target|idr }}</td>
+              <td class="text-end">{% if row.event_outflows %}{{ row.event_outflows|idr }}{% else %}—{% endif %}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-muted">This saved version has no stored year-by-year data.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  {# 8 · Assumptions and explanation #}
+  <section class="card shadow-sm mb-4" aria-labelledby="result-assumptions">
+    <div class="card-body p-4">
+      <details>
+        <summary class="h5 mb-0" id="result-assumptions">How this was estimated <span class="small text-muted fw-normal">(optional)</span></summary>
+        <p class="small text-muted mt-2">These are the assumptions saved with this version. Changing them means saving a new version, so this page always keeps showing the numbers you saved.</p>
+        <dl class="row mb-0">
+          {% for row in assumptions %}
+          <dt class="col-sm-6 fw-normal">{{ row.label }}<div class="small text-muted">{{ row.explanation }}</div></dt>
+          <dd class="col-sm-6">{{ row.value|floatformat:"-2" }}%</dd>
+          {% endfor %}
+          <dt class="col-sm-6 fw-normal">Money you already invest</dt><dd class="col-sm-6">{{ scenario.current_investable_assets|idr }}</dd>
+          <dt class="col-sm-6 fw-normal">Monthly income after your freedom date</dt><dd class="col-sm-6">{{ scenario.post_freedom_monthly_income|idr }}</dd>
+          <dt class="col-sm-6 fw-normal">Where the money figures came from</dt><dd class="col-sm-6">{{ scenario.get_source_mode_display }}{% if scenario.source_month_count %} · {{ scenario.source_month_count }} complete months to {{ scenario.source_period_end|date:"M Y" }}{% endif %}</dd>
+          <dt class="col-sm-6 fw-normal">Calculation version</dt><dd class="col-sm-6">{{ calculation_version }}</dd>
+        </dl>
+      </details>
+    </div>
+  </section>
+
+  {# 9 · Version history and actions #}
+  <section class="card shadow-sm mb-4" aria-labelledby="result-history">
+    <div class="card-body p-4">
+      <h2 class="h5" id="result-history">Saved versions</h2>
+      <ul class="list-group list-group-flush mb-3">
+        {% for version in versions %}
+        <li class="list-group-item px-0 d-flex flex-wrap justify-content-between gap-2">
+          <span>
+            {% if version.pk == scenario.pk %}<strong>Version {{ version.version }}</strong> <span class="badge text-bg-primary">You are here</span>{% else %}<a href="{% url 'freedom_scenario_detail' plan.id version.id %}">Version {{ version.version }}</a>{% endif %}
+            <div class="small text-muted">Saved {{ version.saved_at|date:"j M Y" }} · target {{ version.total_target|idr }}</div>
+          </span>
+          <span class="text-end small text-muted">{% if version.required_monthly_investment is not None %}{{ version.required_monthly_investment|idr }} a month{% else %}Out of range{% endif %}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      <div class="d-flex flex-wrap gap-2">
+        <form method="post" action="{% url 'freedom_scenario_update' plan.id scenario.id %}">{% csrf_token %}<button class="btn btn-primary" type="submit">Change something and save a new version</button></form>
+        <form method="post" action="{% url 'freedom_scenario_duplicate' plan.id scenario.id %}">{% csrf_token %}<button class="btn btn-outline-primary" type="submit">Copy into a new plan</button></form>
+        <form method="post" action="{% url 'freedom_plan_archive' plan.id %}">{% csrf_token %}<button class="btn btn-outline-secondary" type="submit">Archive plan</button></form>
+      </div>
+      {% if has_draft %}<p class="small text-muted mt-2 mb-0">This plan already has an unsaved draft. Opening it again continues where you left off.</p>{% endif %}
+    </div>
+  </section>
+
+  {# 10 · Disclaimer #}
+  <p class="small text-muted border-top pt-3">This is an educational estimate based on the assumptions you saved, not personalized financial advice. Investment returns, inflation, and sustainable withdrawals can differ materially from any estimate.</p>
 </div>
-<div class="card shadow-sm mb-4"><div class="card-body"><h2 class="h5">Saved inputs</h2><dl class="row mb-0"><dt class="col-sm-6">Investable assets</dt><dd class="col-sm-6">{{ scenario.current_investable_assets|idr }}</dd><dt class="col-sm-6">Current monthly investment</dt><dd class="col-sm-6">{{ scenario.current_monthly_investment|idr }}</dd><dt class="col-sm-6">Desired monthly lifestyle</dt><dd class="col-sm-6">{{ scenario.desired_monthly_lifestyle|idr }}</dd><dt class="col-sm-6">Status</dt><dd class="col-sm-6">{{ scenario.get_result_status_display }}</dd></dl></div></div>
-<div class="d-flex flex-wrap gap-2 mb-4">
-  <form method="post" action="{% url 'freedom_scenario_update' plan.id scenario.id %}">{% csrf_token %}<button class="btn btn-primary" type="submit">Create updated version</button></form>
-  <form method="post" action="{% url 'freedom_scenario_duplicate' plan.id scenario.id %}">{% csrf_token %}<button class="btn btn-outline-primary" type="submit">Duplicate to new plan</button></form>
-  <form method="post" action="{% url 'freedom_plan_archive' plan.id %}">{% csrf_token %}<button class="btn btn-outline-secondary" type="submit">Archive plan</button></form>
-</div>
-<p class="small text-muted border-top pt-3">This is an educational estimate based on the assumptions you entered. Investment returns, inflation, and sustainable withdrawals can differ materially. It is not personalized financial advice.</p>
 {% endblock %}

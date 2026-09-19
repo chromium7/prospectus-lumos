@@ -142,3 +142,18 @@ details.card > summary {
         position: static;
     }
 }
+
+.result-shell {
+  max-width: 62rem;
+}
+
+.result-milestones {
+  max-height: 22rem;
+  overflow-y: auto;
+}
+
+.result-milestones thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bs-body-bg);
+}
