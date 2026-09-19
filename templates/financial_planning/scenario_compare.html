@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% load static formatting %}
+
+{% block title %}Compare versions of {{ plan.name }} - Prospectus Lumos{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/financial_planning.css' %}">{% endblock %}
+
+{% block content %}
+<div class="result-shell">
+  <a class="small text-decoration-none" href="{% url 'freedom_plan_list' %}"><i class="bi bi-arrow-left"></i> All plans</a>
+
+  <header class="mt-2 mb-4">
+    <h1 class="h2 mb-1">Compare two versions</h1>
+    <p class="text-muted mb-0">{{ plan.name }} · Looking at saved versions never changes them.</p>
+  </header>
+
+  {% if saved_versions|length < 2 %}
+  <div class="card shadow-sm"><div class="card-body py-5 text-center">
+    <i class="bi bi-layers display-5 text-primary"></i>
+    <h2 class="h4 mt-3">You need two saved versions first</h2>
+    <p class="text-muted mb-0">Save a plan, change something, and save it again. Then you can see exactly what moved.</p>
+  </div></div>
+  {% else %}
+  <form class="card shadow-sm mb-4" method="get" novalidate>
+    <div class="card-body p-4">
+      <div class="row g-3 align-items-end">
+        <div class="col-md-5"><label class="form-label" for="{{ form.left.id_for_label }}">{{ form.left.label }}</label>{{ form.left }}{{ form.left.errors }}</div>
+        <div class="col-md-5"><label class="form-label" for="{{ form.right.id_for_label }}">{{ form.right.label }}</label>{{ form.right }}{{ form.right.errors }}</div>
+        <div class="col-md-2 d-grid"><button class="btn btn-primary" type="submit">Compare</button></div>
+      </div>
+      {% if form.non_field_errors %}<div class="alert alert-danger mt-3 mb-0">{{ form.non_field_errors }}</div>{% endif %}
+    </div>
+  </form>
+  {% endif %}
+
+  {% if comparison %}
+  <section class="card shadow-sm mb-4">
+    <div class="card-body p-4">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="text-muted small">Earlier</div>
+          <a class="h5 d-block" href="{% url 'freedom_scenario_detail' plan.id comparison.left.id %}">Version {{ comparison.left.version }}</a>
+          <div class="small text-muted">Saved {{ comparison.left.saved_at|date:"j M Y" }}</div>
+        </div>
+        <div class="col-md-6">
+          <div class="text-muted small">Newer</div>
+          <a class="h5 d-block" href="{% url 'freedom_scenario_detail' plan.id comparison.right.id %}">Version {{ comparison.right.version }}</a>
+          <div class="small text-muted">Saved {{ comparison.right.saved_at|date:"j M Y" }}</div>
+        </div>
+      </div>
+      {% if not comparison.has_changes and not comparison.event_changes %}
+      <p class="text-muted mt-3 mb-0">These two versions hold the same answers, assumptions, and plans.</p>
+      {% endif %}
+    </div>
+  </section>
+
+  {% for group in comparison.groups %}
+  <section class="card shadow-sm mb-4">
+    <div class="card-body p-4">
+      <h2 class="h5">{{ group.title }}</h2>
+      <p class="small text-muted">{{ group.description }}</p>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th scope="col">What</th><th scope="col" class="text-end">Version {{ comparison.left.version }}</th><th scope="col" class="text-end">Version {{ comparison.right.version }}</th><th scope="col">Change</th></tr></thead>
+          <tbody>
+            {% for row in group.rows %}
+            <tr{% if row.changed %} class="table-active"{% endif %}>
+              <th scope="row" class="fw-normal">{{ row.label }}{% if row.note %}<div class="small text-muted">{{ row.note }}</div>{% endif %}</th>
+              <td class="text-end">{% if row.kind == 'money' %}{% if row.left is not None %}{{ row.left|idr }}{% else %}Out of range{% endif %}{% elif row.kind == 'rate' %}{{ row.left|floatformat:"-2" }}%{% elif row.kind == 'date' %}{{ row.left|date:"F Y"|default:"Not reached" }}{% else %}{{ row.left }}{% endif %}</td>
+              <td class="text-end">{% if row.kind == 'money' %}{% if row.right is not None %}{{ row.right|idr }}{% else %}Out of range{% endif %}{% elif row.kind == 'rate' %}{{ row.right|floatformat:"-2" }}%{% elif row.kind == 'date' %}{{ row.right|date:"F Y"|default:"Not reached" }}{% else %}{{ row.right }}{% endif %}</td>
+              <td>
+                {% if not row.changed %}<span class="text-muted small">Same</span>
+                {% elif row.direction == 'better' %}<span class="badge text-bg-success"><i class="bi bi-arrow-down-circle me-1"></i>Easier</span>
+                {% elif row.direction == 'worse' %}<span class="badge text-bg-warning"><i class="bi bi-arrow-up-circle me-1"></i>Harder</span>
+                {% else %}<span class="badge text-bg-secondary"><i class="bi bi-dot me-1"></i>Changed</span>{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+  {% endfor %}
+
+  <section class="card shadow-sm mb-4">
+    <div class="card-body p-4">
+      <h2 class="h5">Plans along the way</h2>
+      {% if comparison.event_changes %}
+      {% if comparison.events.added %}
+      <h3 class="h6 mt-3">Added in version {{ comparison.right.version }}</h3>
+      <ul class="list-unstyled mb-0">{% for event in comparison.events.added %}<li class="d-flex justify-content-between gap-3 border-bottom py-2"><span>{{ event.name }} <span class="small text-muted">· {{ event.event_date|date:"M Y" }} · {{ event.funding_label }}</span></span><span>{{ event.one_time_amount|idr }}</span></li>{% endfor %}</ul>
+      {% endif %}
+      {% if comparison.events.removed %}
+      <h3 class="h6 mt-3">Removed since version {{ comparison.left.version }}</h3>
+      <ul class="list-unstyled mb-0">{% for event in comparison.events.removed %}<li class="d-flex justify-content-between gap-3 border-bottom py-2"><span>{{ event.name }} <span class="small text-muted">· {{ event.event_date|date:"M Y" }} · {{ event.funding_label }}</span></span><span>{{ event.one_time_amount|idr }}</span></li>{% endfor %}</ul>
+      {% endif %}
+      {% if comparison.events.changed %}
+      <h3 class="h6 mt-3">Changed</h3>
+      <ul class="list-unstyled mb-0">{% for change in comparison.events.changed %}<li class="border-bottom py-2"><strong>{{ change.after.name }}</strong><div class="small text-muted">Was {{ change.before.one_time_amount|idr }} · {{ change.before.funding_label }} → now {{ change.after.one_time_amount|idr }} · {{ change.after.funding_label }}</div></li>{% endfor %}</ul>
+      {% endif %}
+      {% else %}
+      <p class="text-muted mb-0">Both versions hold the same plans.</p>
+      {% endif %}
+    </div>
+  </section>
+
+  <p class="small text-muted border-top pt-3">Both versions stay exactly as you saved them. This page only reads them.</p>
+  {% endif %}
+</div>
+{% endblock %}

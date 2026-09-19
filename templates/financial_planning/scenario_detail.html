@@ -191,7 +191,11 @@
   {# 9 · Version history and actions #}
   <section class="card shadow-sm mb-4" aria-labelledby="result-history">
     <div class="card-body p-4">
-      <h2 class="h5" id="result-history">Saved versions</h2>
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h2 class="h5 mb-0" id="result-history">Saved versions</h2>
+        {% if versions|length > 1 %}<a class="small" href="{% url 'freedom_scenario_compare' plan.id %}">Compare two versions</a>{% endif %}
+      </div>
+      <p class="small text-muted mt-2 mb-2">Each saved version keeps the numbers exactly as they were when you saved it.</p>
       <ul class="list-group list-group-flush mb-3">
         {% for version in versions %}
         <li class="list-group-item px-0 d-flex flex-wrap justify-content-between gap-2">

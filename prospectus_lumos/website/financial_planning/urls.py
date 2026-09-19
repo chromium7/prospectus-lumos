@@ -12,6 +12,7 @@ urlpatterns = [
     path("calculate-preview/", views.calculate_preview_view, name="freedom_calculate_preview"),
     path("<int:plan_id>/draft/", views.plan_draft_view, name="freedom_plan_draft"),
     path("<int:plan_id>/save/", views.plan_save_view, name="freedom_plan_save"),
+    path("<int:plan_id>/compare/", views.scenario_compare_view, name="freedom_scenario_compare"),
     path(
         "<int:plan_id>/scenarios/<int:scenario_id>/",
         views.scenario_detail_view,
