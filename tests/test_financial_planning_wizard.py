@@ -181,6 +181,30 @@ class FinancialPlanningWizardTests(TestCase):
         self.assertEqual(draft.current_monthly_income, 31000000)
         self.assertEqual(draft.current_monthly_expenses, 14000000)
 
+    def test_money_page_shows_the_snapshot_source_period_and_keeps_the_goal_lifestyle(self) -> None:
+        source = DocumentSource.objects.create(
+            user=self.user,
+            source_type=DocumentSource.SourceType.DIRECT_UPLOAD,
+            name="Budget",
+        )
+        Document.objects.create(
+            user=self.user,
+            source=source,
+            month=8,
+            year=2026,
+            total_income=30000000,
+            total_expenses=15000000,
+        )
+        self.client.post(reverse("freedom_plan_create"), _goal_payload(desired_monthly_lifestyle="20000000"))
+        draft = FreedomScenario.objects.get(plan__user=self.user)
+        money_url = reverse("freedom_plan_money", args=(draft.plan_id,))
+
+        response = self.client.get(money_url + "?source=tracked_actuals&period=3m")
+
+        self.assertContains(response, "Source period: Jun 2026 to Aug 2026.")
+        draft.refresh_from_db()
+        self.assertEqual(draft.desired_monthly_lifestyle, 20000000)
+
     def test_events_page_uses_presets_and_saves_reorders_and_deletes(self) -> None:
         self.client.post(reverse("freedom_plan_create"), _goal_payload())
         draft = FreedomScenario.objects.get(plan__user=self.user)
