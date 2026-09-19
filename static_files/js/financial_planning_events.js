@@ -24,11 +24,7 @@
         });
     }
 
-    function addMonths(value, months) {
-        const date = new Date(`${value}T00:00:00`);
-        date.setMonth(date.getMonth() + months);
-        return date.toISOString().slice(0, 10);
-    }
+    const {addMonths, today} = window.PlannerDates;
 
     function addRow(preset) {
         if (visibleRows().length >= maxEvents) return null;
@@ -39,7 +35,7 @@
         list.appendChild(row);
         totalInput.value = String(index + 1);
         if (preset) {
-            const eventDate = addMonths(new Date().toISOString().slice(0, 10), 12);
+            const eventDate = addMonths(today(), 12);
             Object.entries(preset).forEach(([name, value]) => {
                 const field = row.querySelector(`[name$='-${name}']`);
                 if (field && name !== "duration_months" && name !== "label") field.value = String(value);

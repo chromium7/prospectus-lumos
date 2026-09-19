@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from prospectus_lumos.apps.accounts.models import DocumentSource
+from prospectus_lumos.apps.documents.templatetags.formatting import idr
 from prospectus_lumos.apps.documents.models import Document
 from prospectus_lumos.apps.financial_planning.models import FreedomPlan, FreedomScenario
 from prospectus_lumos.website.financial_planning.forms import EVENT_PRESETS
@@ -348,6 +349,18 @@ class FinancialPlanningWizardTests(TestCase):
         self.assertGreater(Decimal(data["summary"]["total_target"]), Decimal("1"))
         self.assertIn("timeline", data)
         self.assertIn("separate_savings", data)
+
+        # Money is formatted server side so the preview and the server-rendered page agree.
+        summary = data["summary"]
+        self.assertEqual(summary["total_target_text"], idr(Decimal(summary["total_target"])))
+        self.assertTrue(summary["total_target_text"].startswith("Rp"))
+        self.assertEqual(
+            summary["required_monthly_investment_text"],
+            idr(Decimal(summary["required_monthly_investment"])),
+        )
+        first_row = data["timeline"][0]
+        self.assertEqual(first_row["closing_balance_text"], idr(Decimal(first_row["closing_balance"])))
+        self.assertEqual(first_row["target_text"], idr(Decimal(first_row["target"])))
 
         self.client.login(username="other-wizard", password="pass")
         forbidden = self.client.post(preview_url, {**_review_payload(), "plan_id": draft.plan_id})

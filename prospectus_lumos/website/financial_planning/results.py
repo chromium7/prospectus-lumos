@@ -111,6 +111,18 @@ def _iso_to_date(value: Any) -> date | None:
         return None
 
 
+def money_text(value: Any) -> str | None:
+    """Format a payload money value the way the page's `|idr` filter does.
+
+    Amounts are formatted server side so the browser never re-derives or re-rounds a money value.
+    A missing amount stays ``None`` so the caller can choose its own wording for "no figure".
+    """
+
+    if value is None:
+        return None
+    return idr(_decimal(value))
+
+
 def _case_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
     """Return conservative/base/optimistic rows without any probability claim."""
 
