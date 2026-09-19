@@ -173,6 +173,7 @@ prospectus_lumos/
 
 ### Key Management Commands
 - `python manage.py setup_sample_data` - Create test data
+- `python manage.py report_legacy_baseline [--user <username>] [--format json]` - Read-only report of current legacy monthly income/expense totals per user, used as the migration comparison baseline
 - `python manage.py migrate` - Apply database changes
 - `python manage.py collectstatic` - Collect static files
 
