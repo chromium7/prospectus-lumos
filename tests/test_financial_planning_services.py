@@ -226,6 +226,65 @@ class FreedomScenarioServiceTests(TestCase):
         self.assertEqual(custom.month_count, 3)
         self.assertNotIn("2026-09", custom.represented_months)
 
+    def test_snapshot_totals_clamp_when_document_headers_do_not_reconcile(self) -> None:
+        source = DocumentSource.objects.create(
+            user=self.user,
+            source_type=DocumentSource.SourceType.DIRECT_UPLOAD,
+            name="Re-imported budget",
+        )
+        # Header totals are stored separately from transactions, so a re-imported month
+        # can carry transactions worth more than the header claims.
+        document = Document.objects.create(
+            user=self.user,
+            source=source,
+            month=8,
+            year=2026,
+            total_income=Decimal("100"),
+            total_expenses=Decimal("40"),
+        )
+        Transaction.objects.bulk_create(
+            [
+                Transaction(
+                    document=document, transaction_type="income", amount=250, description="Bonus", category="Bonus"
+                ),
+                Transaction(
+                    document=document, transaction_type="expense", amount=90, description="Rent", category="Rent"
+                ),
+            ]
+        )
+
+        snapshot = ActualsSnapshotService(user=self.user, snapshot_date=date(2026, 9, 6)).create_snapshot(
+            period="3m",
+            excluded_income_categories=("Bonus",),
+            excluded_expense_categories=("Rent",),
+        )
+
+        self.assertEqual(snapshot.total_income, Decimal("0"))
+        self.assertEqual(snapshot.total_expenses, Decimal("0"))
+        self.assertEqual(snapshot.average_income, Decimal("0.00"))
+        self.assertEqual(snapshot.average_expenses, Decimal("0.00"))
+        self.assertEqual(snapshot.scenario_values()["current_monthly_income"], Decimal("0.00"))
+
+    def test_snapshot_scenario_values_omit_the_goal_step_lifestyle(self) -> None:
+        source = DocumentSource.objects.create(
+            user=self.user,
+            source_type=DocumentSource.SourceType.DIRECT_UPLOAD,
+            name="Tracked budget",
+        )
+        Document.objects.create(
+            user=self.user,
+            source=source,
+            month=8,
+            year=2026,
+            total_income=Decimal("30000000"),
+            total_expenses=Decimal("15000000"),
+        )
+        snapshot = ActualsSnapshotService(user=self.user, snapshot_date=date(2026, 9, 6)).create_snapshot(period="3m")
+
+        # The money step does not collect this field, so suggesting it here would be
+        # silently dropped. The goal step stays the only owner of the lifestyle target.
+        self.assertNotIn("desired_monthly_lifestyle", snapshot.scenario_values())
+
     def test_saved_tracked_snapshot_is_immutable_after_source_changes(self) -> None:
         source = DocumentSource.objects.create(
             user=self.user,
