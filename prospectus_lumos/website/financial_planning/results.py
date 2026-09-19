@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import defaultdict, deque
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -210,10 +211,13 @@ def _separate_savings(payload: dict[str, Any]) -> list[dict[str, Any]]:
 def _event_rows(scenario: FreedomScenario) -> list[dict[str, Any]]:
     """Describe the saved events in plain language, ordered as the user arranged them."""
 
-    separate_needs = {item["name"]: item for item in _separate_savings(scenario.projection_data or {})}
+    separate_needs: dict[tuple[str, date | None], deque[dict[str, Any]]] = defaultdict(deque)
+    for item in _separate_savings(scenario.projection_data or {}):
+        separate_needs[(item["name"], item["event_date"])].append(item)
     rows: list[dict[str, Any]] = []
     for event in scenario.events.all():
         from_portfolio = event.funding_source == FinancialEvent.FundingSource.INVESTMENT_PORTFOLIO
+        matching_needs = separate_needs.get((event.name, event.event_date))
         rows.append(
             {
                 "event": event,
@@ -224,7 +228,7 @@ def _event_rows(scenario: FreedomScenario) -> list[dict[str, Any]]:
                     if from_portfolio
                     else "Does not touch the investments in this estimate."
                 ),
-                "separate_need": separate_needs.get(event.name),
+                "separate_need": matching_needs.popleft() if not from_portfolio and matching_needs else None,
             }
         )
     return rows

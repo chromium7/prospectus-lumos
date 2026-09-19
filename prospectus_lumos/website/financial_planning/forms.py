@@ -219,10 +219,7 @@ class FreedomScenarioForm(forms.ModelForm):
         """Return useful defaults for a manual-only user."""
 
         today = timezone.localdate()
-        try:
-            target = today.replace(year=today.year + 20, day=1)
-        except ValueError:
-            target = date(today.year + 20, today.month, 1)
+        target = today.replace(year=today.year + 20, day=1)
         return {
             "calculation_date": today,
             "target_date": target,
@@ -517,8 +514,6 @@ class BaseFinancialEventFormSet(BaseInlineFormSet):
         if any(self.errors):
             return
         active_forms = [form for form in self.forms if form.cleaned_data and not form.cleaned_data.get("DELETE", False)]
-        if len(active_forms) > MAX_EVENT_FORMS:
-            raise forms.ValidationError(f"At most {MAX_EVENT_FORMS} life events are supported.", code="too_many_events")
         if self.calculation_date:
             for form in active_forms:
                 event_date = form.cleaned_data.get("event_date")

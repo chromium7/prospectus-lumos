@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 from datetime import date
 from decimal import Decimal
+from typing import cast
 
 from django.contrib.auth.models import User
+from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -52,9 +54,9 @@ class ScenarioResultPageTests(TestCase):
         draft = self.plan.scenarios.get(status=FreedomScenario.Status.DRAFT)
         return self.service.save_draft(user=self.user, draft=draft)
 
-    def _get_detail(self, scenario: FreedomScenario) -> object:
+    def _get_detail(self, scenario: FreedomScenario) -> HttpResponse:
         self.client.login(username="reader", password="pass")
-        return self.client.get(reverse("freedom_scenario_detail", args=(self.plan.pk, scenario.pk)))
+        return cast(HttpResponse, self.client.get(reverse("freedom_scenario_detail", args=(self.plan.pk, scenario.pk))))
 
     def test_context_is_built_from_stored_outputs_only(self) -> None:
         scenario = self._save_version()
@@ -135,6 +137,42 @@ class ScenarioResultPageTests(TestCase):
         self.assertFalse(rows[1]["from_portfolio"])
         self.assertIsNone(rows[0]["separate_need"])
         self.assertIsNotNone(rows[1]["separate_need"])
+
+    def test_same_named_separate_events_keep_their_own_savings_need(self) -> None:
+        draft = self.plan.scenarios.get(status=FreedomScenario.Status.DRAFT)
+        event_date = date(timezone.localdate().year + 3, 1, 1)
+        self.service.update_draft(
+            user=self.user,
+            draft=draft,
+            scenario_data={},
+            events=[
+                {
+                    "name": "Education",
+                    "category": FinancialEvent.Category.EDUCATION,
+                    "event_date": event_date,
+                    "one_time_amount": Decimal("100000000"),
+                    "amount_basis": FinancialEvent.AmountBasis.EVENT_DATE,
+                    "funding_source": FinancialEvent.FundingSource.SEPARATE_SAVINGS,
+                    "sort_order": 0,
+                },
+                {
+                    "name": "Education",
+                    "category": FinancialEvent.Category.EDUCATION,
+                    "event_date": event_date,
+                    "one_time_amount": Decimal("200000000"),
+                    "amount_basis": FinancialEvent.AmountBasis.EVENT_DATE,
+                    "funding_source": FinancialEvent.FundingSource.SEPARATE_SAVINGS,
+                    "sort_order": 1,
+                },
+            ],
+        )
+        scenario = self._save_version()
+
+        rows = scenario_result_context(scenario)["event_rows"]
+        self.assertEqual(
+            [row["separate_need"]["nominal_total"] for row in rows],
+            [Decimal("100000000"), Decimal("200000000")],
+        )
 
     def test_page_answers_before_it_explains(self) -> None:
         response = self._get_detail(self._save_version())

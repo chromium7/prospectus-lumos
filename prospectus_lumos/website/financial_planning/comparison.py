@@ -142,8 +142,8 @@ def _output_rows(left: FreedomScenario, right: FreedomScenario) -> list[Comparis
     ]
 
 
-def _event_key(event: FinancialEvent) -> str:
-    return f"{event.name.strip().lower()}|{event.event_date.isoformat()}"
+def _event_key(event: FinancialEvent) -> tuple[str, date, int]:
+    return event.name.strip().lower(), event.event_date, event.sort_order
 
 
 def _event_summary(event: FinancialEvent) -> dict[str, Any]:

@@ -130,6 +130,59 @@ class ScenarioComparisonTests(TestCase):
         self.assertEqual(changed[0]["before"]["one_time_amount"], Decimal("300000000.00"))
         self.assertEqual(changed[0]["after"]["one_time_amount"], Decimal("450000000.00"))
 
+    def test_same_named_events_on_the_same_date_remain_distinct(self) -> None:
+        latest = self.plan.scenarios.filter(status=FreedomScenario.Status.SAVED).order_by("-version").first()
+        assert latest is not None
+        event_date = date(timezone.localdate().year + 3, 1, 1)
+        draft = self.service.clone_to_draft(user=self.user, scenario=latest)
+        self.service.update_draft(
+            user=self.user,
+            draft=draft,
+            scenario_data={},
+            events=[
+                {
+                    "name": "Education",
+                    "category": FinancialEvent.Category.EDUCATION,
+                    "event_date": event_date,
+                    "one_time_amount": Decimal("100000000"),
+                    "funding_source": FinancialEvent.FundingSource.INVESTMENT_PORTFOLIO,
+                    "sort_order": 0,
+                },
+                {
+                    "name": "Education",
+                    "category": FinancialEvent.Category.EDUCATION,
+                    "event_date": event_date,
+                    "one_time_amount": Decimal("200000000"),
+                    "funding_source": FinancialEvent.FundingSource.INVESTMENT_PORTFOLIO,
+                    "sort_order": 1,
+                },
+            ],
+        )
+        version_with_two_events = self.service.save_draft(user=self.user, draft=draft)
+
+        next_draft = self.service.clone_to_draft(user=self.user, scenario=version_with_two_events)
+        self.service.update_draft(
+            user=self.user,
+            draft=next_draft,
+            scenario_data={},
+            events=[
+                {
+                    "name": "Education",
+                    "category": FinancialEvent.Category.EDUCATION,
+                    "event_date": event_date,
+                    "one_time_amount": Decimal("100000000"),
+                    "funding_source": FinancialEvent.FundingSource.INVESTMENT_PORTFOLIO,
+                    "sort_order": 0,
+                }
+            ],
+        )
+        version_with_one_event = self.service.save_draft(user=self.user, draft=next_draft)
+
+        events = compare_events(version_with_two_events, version_with_one_event)
+        self.assertEqual(len(events["unchanged"]), 1)
+        self.assertEqual(len(events["removed"]), 1)
+        self.assertEqual(events["removed"][0]["one_time_amount"], Decimal("200000000.00"))
+
     def test_comparison_leaves_both_versions_untouched(self) -> None:
         second = self._next_version(current_monthly_investment=Decimal("25000000"))
         self.first.refresh_from_db()
