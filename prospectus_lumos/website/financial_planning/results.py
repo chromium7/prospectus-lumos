@@ -4,9 +4,14 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from prospectus_lumos.apps.documents.templatetags.formatting import idr
 from prospectus_lumos.apps.financial_planning.models import FinancialEvent, FreedomScenario
 
 CASE_ORDER = ("conservative", "base", "optimistic")
+
+# The stored ledger holds one row per month for up to 100 years. Charting every row would render
+# unreadable labels, so display is downsampled while the year-by-year table keeps the exact data.
+CHART_MAX_POINTS = 120
 
 CASE_COPY: dict[str, dict[str, str]] = {
     "conservative": {
@@ -252,4 +257,83 @@ def scenario_result_context(scenario: FreedomScenario) -> dict[str, Any]:
         "warnings": _warning_rows(payload),
         "schema_version": payload.get("schema_version"),
         "calculation_version": payload.get("calculation_version", scenario.calculation_version),
+    }
+
+
+def _downsample(rows: list[dict[str, Any]], *, keep: set[int]) -> list[dict[str, Any]]:
+    """Thin display rows to at most ``CHART_MAX_POINTS`` while keeping required indexes."""
+
+    if len(rows) <= CHART_MAX_POINTS:
+        return rows
+    step = len(rows) // CHART_MAX_POINTS + 1
+    last_index = len(rows) - 1
+    return [row for index, row in enumerate(rows) if index % step == 0 or index in keep or index == last_index]
+
+
+def timeline_chart_payload(scenario: FreedomScenario) -> dict[str, Any]:
+    """Return JSON-safe display data for the portfolio timeline.
+
+    Amounts are pre-formatted server side so the browser never re-derives or re-rounds a money
+    value; the numeric fields exist only to position points on the chart.
+    """
+
+    payload: dict[str, Any] = scenario.projection_data or {}
+    monthly = [row for row in payload.get("monthly") or [] if isinstance(row, dict)]
+    target_month = scenario.target_date.replace(day=1).isoformat()
+    display_rows = [row for row in monthly if str(row.get("date", "")) <= target_month] or monthly
+    event_indexes = {index for index, row in enumerate(display_rows) if _decimal(row.get("event_outflow")) > 0}
+    crossing_index: int | None = next(
+        (
+            index
+            for index, row in enumerate(display_rows)
+            if _decimal(row.get("target")) > 0 and _decimal(row.get("closing_balance")) >= _decimal(row.get("target"))
+        ),
+        None,
+    )
+    keep = set(event_indexes)
+    if crossing_index is not None:
+        keep.add(crossing_index)
+
+    points: list[dict[str, Any]] = []
+    for row in _downsample(display_rows, keep=keep):
+        balance = _decimal(row.get("closing_balance"))
+        target = _decimal(row.get("target"))
+        outflow = _decimal(row.get("event_outflow"))
+        points.append(
+            {
+                "date": row.get("date"),
+                "balance": float(balance),
+                "target": float(target),
+                "balance_text": idr(balance),
+                "target_text": idr(target),
+                "event": bool(outflow > 0),
+                "event_text": idr(outflow) if outflow > 0 else "",
+            }
+        )
+    crossing = display_rows[crossing_index]["date"] if crossing_index is not None else None
+    return {
+        "points": points,
+        "crossing_date": crossing,
+        "currency": payload.get("currency", "IDR"),
+        "point_count": len(points),
+        "month_count": len(display_rows),
+    }
+
+
+def timeline_summary(scenario: FreedomScenario, chart: dict[str, Any]) -> dict[str, Any]:
+    """Describe the timeline in words so the page works without seeing the chart."""
+
+    points: list[dict[str, Any]] = chart.get("points") or []
+    if not points:
+        return {"has_points": False}
+    return {
+        "has_points": True,
+        "start_date": _iso_to_date(points[0]["date"]),
+        "end_date": _iso_to_date(points[-1]["date"]),
+        "start_balance": points[0]["balance_text"],
+        "end_balance": points[-1]["balance_text"],
+        "end_target": points[-1]["target_text"],
+        "event_count": sum(1 for point in points if point["event"]),
+        "crossing_date": _iso_to_date(chart.get("crossing_date")),
+        "month_count": chart.get("month_count", 0),
     }

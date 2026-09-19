@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import date
 from decimal import Decimal
 
@@ -10,7 +11,12 @@ from django.utils import timezone
 
 from prospectus_lumos.apps.financial_planning.models import FinancialEvent, FreedomPlan, FreedomScenario
 from prospectus_lumos.apps.financial_planning.services import FreedomScenarioService
-from prospectus_lumos.website.financial_planning.results import scenario_result_context
+from prospectus_lumos.website.financial_planning.results import (
+    CHART_MAX_POINTS,
+    scenario_result_context,
+    timeline_chart_payload,
+    timeline_summary,
+)
 
 
 def _scenario_values(**overrides: object) -> dict[str, object]:
@@ -183,3 +189,101 @@ class ScenarioResultPageTests(TestCase):
         response = self.client.get(reverse("freedom_scenario_detail", args=(plan.pk, scenario.pk)))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "no stored year-by-year data")
+
+
+class ScenarioTimelineChartTests(TestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(username="charter", password="pass")
+        self.service = FreedomScenarioService()
+        draft = self.service.create_plan_with_draft(
+            user=self.user,
+            plan_data={"name": "Chart plan", "description": ""},
+            scenario_data=_scenario_values(),
+        )
+        self.plan = draft.plan
+
+    def _save_version(self) -> FreedomScenario:
+        draft = self.plan.scenarios.get(status=FreedomScenario.Status.DRAFT)
+        return self.service.save_draft(user=self.user, draft=draft)
+
+    def test_display_points_are_downsampled_but_the_table_is_not(self) -> None:
+        scenario = self._save_version()
+        chart = timeline_chart_payload(scenario)
+        self.assertLessEqual(chart["point_count"], CHART_MAX_POINTS + 2)
+        self.assertGreater(chart["month_count"], chart["point_count"])
+        self.assertEqual(
+            len(scenario_result_context(scenario)["annual_rows"]),
+            scenario.target_date.year - scenario.calculation_date.year + 1,
+        )
+
+    def test_points_carry_server_formatted_idr_text(self) -> None:
+        chart = timeline_chart_payload(self._save_version())
+        point = chart["points"][0]
+        self.assertTrue(point["balance_text"].startswith("Rp"))
+        self.assertTrue(point["target_text"].startswith("Rp"))
+        self.assertIsInstance(point["balance"], float)
+
+    def test_event_months_are_flagged_for_a_non_colour_marker(self) -> None:
+        draft = self.plan.scenarios.get(status=FreedomScenario.Status.DRAFT)
+        year = timezone.localdate().year
+        self.service.update_draft(
+            user=self.user,
+            draft=draft,
+            scenario_data={},
+            events=[
+                {
+                    "name": "Buy a family car",
+                    "category": FinancialEvent.Category.CAR,
+                    "event_date": date(year + 3, 1, 1),
+                    "one_time_amount": Decimal("300000000"),
+                    "funding_source": FinancialEvent.FundingSource.INVESTMENT_PORTFOLIO,
+                    "sort_order": 0,
+                }
+            ],
+        )
+        chart = timeline_chart_payload(self._save_version())
+        flagged = [point for point in chart["points"] if point["event"]]
+        self.assertEqual(len(flagged), 1)
+        self.assertTrue(flagged[0]["event_text"].startswith("Rp"))
+
+    def test_chart_data_is_serialized_through_json_script(self) -> None:
+        scenario = self._save_version()
+        self.client.login(username="charter", password="pass")
+        response = self.client.get(reverse("freedom_scenario_detail", args=(self.plan.pk, scenario.pk)))
+        body = response.content.decode()
+        self.assertIn('<script id="freedom-timeline-data" type="application/json">', body)
+        self.assertIn('id="freedomTimelineChart"', body)
+        raw = body.split('<script id="freedom-timeline-data" type="application/json">')[1].split("</script>")[0]
+        self.assertEqual(json.loads(raw)["point_count"], timeline_chart_payload(scenario)["point_count"])
+
+    def test_plan_name_cannot_inject_script_markup_into_the_chart_payload(self) -> None:
+        self.plan.name = "</script><script>alert(1)</script>"
+        self.plan.save(update_fields=("name",))
+        scenario = self._save_version()
+        self.client.login(username="charter", password="pass")
+        response = self.client.get(reverse("freedom_scenario_detail", args=(self.plan.pk, scenario.pk)))
+        self.assertNotIn("<script>alert(1)</script>", response.content.decode())
+
+    def test_timeline_is_summarised_in_words(self) -> None:
+        scenario = self._save_version()
+        summary = timeline_summary(scenario, timeline_chart_payload(scenario))
+        self.assertTrue(summary["has_points"])
+        self.assertEqual(summary["end_date"].year, scenario.target_date.year)
+        self.client.login(username="charter", password="pass")
+        response = self.client.get(reverse("freedom_scenario_detail", args=(self.plan.pk, scenario.pk)))
+        self.assertContains(response, "The exact figures are in the year-by-year table below.")
+
+    def test_missing_monthly_data_degrades_to_a_message(self) -> None:
+        plan = FreedomPlan.objects.create(user=self.user, name="Legacy chart")
+        scenario = FreedomScenario.objects.create(
+            plan=plan,
+            version=1,
+            status=FreedomScenario.Status.SAVED,
+            calculation_date=date(2026, 9, 4),
+            target_date=date(2046, 9, 1),
+            desired_monthly_lifestyle=Decimal("20000000"),
+            saved_at=timezone.now(),
+        )
+        self.client.login(username="charter", password="pass")
+        response = self.client.get(reverse("freedom_scenario_detail", args=(plan.pk, scenario.pk)))
+        self.assertContains(response, "no stored month-by-month data to chart")

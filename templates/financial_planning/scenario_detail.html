@@ -2,6 +2,7 @@
 {% load static formatting %}
 
 {% block title %}{{ plan.name }} version {{ scenario.version }} - Prospectus Lumos{% endblock %}
+
 {% block extra_css %}<link rel="stylesheet" href="{% static 'css/financial_planning.css' %}">{% endblock %}
 
 {% block content %}
@@ -45,6 +46,28 @@
     <div class="col-md-6 col-xl-3"><div class="card h-100 shadow-sm"><div class="card-body"><div class="text-muted small">At your current pace</div><div class="h4 mb-0">{{ scenario.projected_achievement_date|date:"M Y"|default:"Not reached" }}</div><div class="small text-muted">Shortfall {{ scenario.funding_gap|idr }} a month</div></div></div></div>
     <div class="col-md-6 col-xl-3"><div class="card h-100 shadow-sm"><div class="card-body"><div class="text-muted small">Progress so far</div><div class="h4 mb-0">{{ scenario.progress_percent|floatformat:"-1" }}%</div><div class="small text-muted">{{ scenario.current_investable_assets|idr }} invested</div></div></div></div>
   </div>
+
+
+  {# 3 · Timeline chart, with the same story told in words #}
+  <section class="card shadow-sm mb-4" aria-labelledby="result-timeline">
+    <div class="card-body p-4">
+      <h2 class="h5" id="result-timeline">How your investments could grow</h2>
+      {% if chart_summary.has_points %}
+      <p class="small text-muted">
+        Between {{ chart_summary.start_date|date:"F Y" }} and {{ chart_summary.end_date|date:"F Y" }} this estimate grows your investments from {{ chart_summary.start_balance }} to {{ chart_summary.end_balance }}, against a target of {{ chart_summary.end_target }} at the end.
+        {% if chart_summary.event_count %}{{ chart_summary.event_count }} month{{ chart_summary.event_count|pluralize }} with a plan payment {{ chart_summary.event_count|pluralize:"is,are" }} marked with a triangle.{% endif %}
+        {% if chart_summary.crossing_date %}The estimate first reaches the target in {{ chart_summary.crossing_date|date:"F Y" }}.{% else %}The estimate does not reach the target inside this period.{% endif %}
+        The exact figures are in the year-by-year table below.
+      </p>
+      <div class="result-chart">
+        <canvas id="freedomTimelineChart" role="img" aria-label="Line chart of estimated investments against the target, from {{ chart_summary.start_date|date:"F Y" }} to {{ chart_summary.end_date|date:"F Y" }}. The same figures are listed in the year-by-year table below."></canvas>
+      </div>
+      {{ chart_data|json_script:"freedom-timeline-data" }}
+      {% else %}
+      <p class="text-muted mb-0">This saved version has no stored month-by-month data to chart.</p>
+      {% endif %}
+    </div>
+  </section>
 
   {# 4 · Target breakdown #}
   <section class="card shadow-sm mb-4" aria-labelledby="result-breakdown">
@@ -192,4 +215,9 @@
   {# 10 · Disclaimer #}
   <p class="small text-muted border-top pt-3">This is an educational estimate based on the assumptions you saved, not personalized financial advice. Investment returns, inflation, and sustainable withdrawals can differ materially from any estimate.</p>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{% static 'js/financial_planning_chart.js' %}"></script>
 {% endblock %}
