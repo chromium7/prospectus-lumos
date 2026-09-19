@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
+from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import FileExtensionValidator
@@ -75,3 +77,63 @@ class DocumentSource(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user.username} - {self.name}"
+
+
+class Workspace(models.Model):
+    """A tenant boundary that owns every financial row belonging to one person or household."""
+
+    class Kind(models.TextChoices):
+        PERSONAL = "personal", "Personal"
+        HOUSEHOLD = "household", "Household"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=120)
+    slug = models.SlugField(
+        max_length=140, unique=True, help_text="Stable URL identifier; renaming the workspace does not change it."
+    )
+    kind = models.CharField(max_length=10, choices=Kind.choices, default=Kind.PERSONAL)
+    currency = models.CharField(max_length=3, default="IDR", help_text="ISO 4217 code.")
+    timezone = models.CharField(max_length=64, default="Asia/Jakarta", help_text="IANA time zone name.")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="created_workspaces"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("name",)
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class Membership(models.Model):
+    """A user's role in a workspace; the only path through which workspace data is authorized."""
+
+    class Role(models.TextChoices):
+        OWNER = "owner", "Owner"
+        EDITOR = "editor", "Editor"
+        VIEWER = "viewer", "Viewer"
+
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Active"
+        SUSPENDED = "suspended", "Suspended"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name="memberships")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="memberships")
+    role = models.CharField(max_length=10, choices=Role.choices, default=Role.VIEWER)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.ACTIVE)
+    joined_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=("workspace", "user"), name="membership_workspace_user_uniq")]
+        indexes = [
+            models.Index(fields=("user", "status"), name="membership_user_status_idx"),
+            models.Index(fields=("workspace", "role", "status"), name="membership_workspace_role_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user.username} - {self.workspace.name} ({self.role})"

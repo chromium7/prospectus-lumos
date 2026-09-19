@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import UserProfile, GoogleDriveCredentials, DocumentSource
+from .models import UserProfile, GoogleDriveCredentials, DocumentSource, Membership, Workspace
 
 
 @admin.register(UserProfile)
@@ -41,3 +41,25 @@ class DocumentSourceAdmin(admin.ModelAdmin):
         ("Sync Information", {"fields": ("last_sync",)}),
         ("Timestamps", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
     )
+
+
+@admin.register(Workspace)
+class WorkspaceAdmin(admin.ModelAdmin):
+    """Admin for workspaces"""
+
+    list_display = ["name", "slug", "kind", "currency", "timezone", "archived_at", "created_at"]
+    list_filter = ["kind", "currency", "created_at"]
+    search_fields = ["name", "slug"]
+    prepopulated_fields = {"slug": ("name",)}
+    readonly_fields = ["created_at", "updated_at"]
+
+
+@admin.register(Membership)
+class MembershipAdmin(admin.ModelAdmin):
+    """Admin for workspace memberships"""
+
+    list_display = ["workspace", "user", "role", "status", "joined_at"]
+    list_filter = ["role", "status", "joined_at"]
+    search_fields = ["workspace__name", "workspace__slug", "user__username", "user__email"]
+    autocomplete_fields = ["workspace", "user"]
+    readonly_fields = ["joined_at", "updated_at"]
