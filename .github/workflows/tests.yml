@@ -1,6 +1,11 @@
 name: Tests
 
-on: [pull_request]
+on: [push, pull_request]
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -39,6 +44,9 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
           cp prospectus_lumos/local_settings.ci.py prospectus_lumos/local_settings.py
+
+      - name: Django framework checks
+        run: python manage.py check
 
       - name: Run tests
         run: python manage.py test

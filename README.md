@@ -25,7 +25,7 @@ The project is organized into separate Django apps for better modularity:
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.13 (the version used by CI)
 - Virtual environment (recommended)
 
 ### Installation
@@ -175,6 +175,60 @@ prospectus_lumos/
 - `python manage.py setup_sample_data` - Create test data
 - `python manage.py migrate` - Apply database changes
 - `python manage.py collectstatic` - Collect static files
+
+### Testing
+
+The supported test command is Django's own runner. It is the single command used
+locally and in CI — there is no `pytest` configuration in this project:
+
+```bash
+python manage.py test
+```
+
+Tests live in the top-level `tests/` package and are discovered automatically.
+To run a subset, pass a dotted path:
+
+```bash
+python manage.py test tests.test_expenses
+python manage.py test tests.test_expenses.ExpenseSheetServiceSyncTests
+```
+
+The suite needs a reachable PostgreSQL database; configure it in your gitignored
+`prospectus_lumos/local_settings.py`. `prospectus_lumos/local_settings.ci.py` is
+the committed CI equivalent and shows the expected shape.
+
+### Framework, lint, and type checks
+
+```bash
+python manage.py check   # Django system checks (run in CI)
+ruff check .             # lint the whole tree; currently clean
+```
+
+Type checking is scoped to the files you changed, the same way CI scopes it —
+the tree as a whole is not yet mypy-clean, so `mypy .` will report pre-existing
+errors:
+
+```bash
+FILES=$(git diff --name-only --diff-filter=ACM $(git merge-base HEAD origin/master) \
+  | grep "\.py" | grep -v settings | grep -v migrations)
+mypy $FILES --ignore-missing-imports --disallow-untyped-defs --follow-imports silent
+```
+
+`pre-commit run --files <paths>` runs the same ruff and mypy hooks, as configured
+in `.pre-commit-config.yaml`.
+
+`python manage.py check --deploy` belongs to the **production** checklist, not to
+CI. Against development settings it reports seven expected warnings — `W004`,
+`W008`, `W009`, `W012`, `W016`, `W018` (`DEBUG=True`), and `W020` (empty
+`ALLOWED_HOSTS`) — all of which are development-only and must be resolved by
+production settings before deployment.
+
+### Continuous integration
+
+- `.github/workflows/tests.yml` — runs `manage.py check` then `manage.py test`
+  against PostgreSQL and Redis services, on every push and pull request.
+- `.github/workflows/code_style.yml` — runs `mypy` and `ruff` over the files
+  changed against `master`.
 
 ### Adding New Features
 1. Models go in the appropriate app (`accounts`, `documents`, `transactions`)
