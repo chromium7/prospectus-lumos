@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     # 3rd party apps
     'django_extensions',
     'rest_framework',
+    'drf_spectacular',
 
     # Local apps
     'prospectus_lumos.apps.accounts',
@@ -165,6 +166,67 @@ API_REQUIRES_HTTPS = True
 
 REST_FRAMEWORK = {
     'EXCEPTION_HANDLER': 'prospectus_lumos.api.exceptions.api_exception_handler',
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+# OpenAPI schema. The checked-in snapshot lives at openapi.yaml in the repo
+# root and CI fails when it drifts from what the code generates; regenerate it
+# with `python manage.py spectacular --file openapi.yaml`.
+API_VERSION = '1.0.0'
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Prospectus Lumos API',
+    'DESCRIPTION': 'Budgeting and financial planning API.',
+    'VERSION': API_VERSION,
+    'SERVE_INCLUDE_SCHEMA': False,
+    'SCHEMA_PATH_PREFIX': '/api',
+    'SORT_OPERATIONS': True,
+    # The error envelope and cursor page shape come from hand-written
+    # infrastructure rather than serializers, so declare them explicitly.
+    'APPEND_COMPONENTS': {
+        'schemas': {
+            'Error': {
+                'type': 'object',
+                'required': ['error'],
+                'properties': {
+                    'error': {
+                        'type': 'object',
+                        'required': ['code', 'message', 'fields', 'request_id'],
+                        'properties': {
+                            'code': {
+                                'type': 'string',
+                                'description': 'Stable machine-readable error code.',
+                                'example': 'validation_error',
+                            },
+                            'message': {'type': 'string'},
+                            'fields': {
+                                'type': 'object',
+                                'description': 'Per-field messages; empty for non-validation errors.',
+                                'additionalProperties': {
+                                    'type': 'array',
+                                    'items': {'type': 'string'},
+                                },
+                            },
+                            'request_id': {
+                                'type': 'string',
+                                'description': 'Matches the X-Request-ID response header.',
+                            },
+                        },
+                    },
+                },
+            },
+            'CursorPage': {
+                'type': 'object',
+                'required': ['count', 'next', 'previous', 'results'],
+                'properties': {
+                    'count': {'type': 'integer'},
+                    'next': {'type': 'string', 'nullable': True, 'format': 'uri'},
+                    'previous': {'type': 'string', 'nullable': True, 'format': 'uri'},
+                    'results': {'type': 'array', 'items': {}},
+                },
+            },
+        },
+    },
 }
 
 # Every log line carries the request's X-Request-ID so an error report can be

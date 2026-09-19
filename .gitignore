@@ -5,6 +5,7 @@
 __pycache__/
 local_settings.py
 db.sqlite3
+openapi.generated.yaml
 media
 static
 node_modules

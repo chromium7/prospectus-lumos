@@ -171,6 +171,21 @@ prospectus_lumos/
 └── manage.py
 ```
 
+### API Schema
+
+The OpenAPI document is generated from the code and served at `/api/schema`.
+Browsable Redoc docs are available at `/api/schema/docs` when `DEBUG` is on;
+production publishes the schema document only.
+
+A snapshot is checked in at `openapi.yaml`, and CI fails with a diff when it
+drifts from what the code generates. After changing any API surface:
+
+```bash
+python manage.py spectacular --file openapi.yaml --fail-on-warn
+```
+
+Commit the regenerated file alongside the change.
+
 ### Key Management Commands
 - `python manage.py setup_sample_data` - Create test data
 - `python manage.py migrate` - Apply database changes

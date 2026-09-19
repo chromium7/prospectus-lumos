@@ -42,3 +42,11 @@ jobs:
 
       - name: Run tests
         run: python manage.py test
+
+      - name: Check the OpenAPI snapshot is current
+        run: |
+          python manage.py spectacular --file openapi.generated.yaml --fail-on-warn
+          if ! diff -u openapi.yaml openapi.generated.yaml; then
+            echo "::error::openapi.yaml is stale. Regenerate it with 'python manage.py spectacular --file openapi.yaml' and commit the result."
+            exit 1
+          fi

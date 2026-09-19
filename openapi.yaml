@@ -1,0 +1,99 @@
+openapi: 3.0.3
+info:
+  title: Prospectus Lumos API
+  version: 1.0.0
+  description: Budgeting and financial planning API.
+paths:
+  /api/ping:
+    get:
+      operationId: ping_retrieve
+      summary: Liveness probe
+      tags:
+      - ping
+      security:
+      - singleTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+          description: ''
+    post:
+      operationId: ping_create
+      summary: Liveness probe
+      tags:
+      - ping
+      security:
+      - singleTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+          description: ''
+components:
+  schemas:
+    CursorPage:
+      type: object
+      required:
+      - count
+      - next
+      - previous
+      - results
+      properties:
+        count:
+          type: integer
+        next:
+          type: string
+          nullable: true
+          format: uri
+        previous:
+          type: string
+          nullable: true
+          format: uri
+        results:
+          type: array
+          items: {}
+    Error:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - code
+          - message
+          - fields
+          - request_id
+          properties:
+            code:
+              type: string
+              description: Stable machine-readable error code.
+              example: validation_error
+            message:
+              type: string
+            fields:
+              type: object
+              description: Per-field messages; empty for non-validation errors.
+              additionalProperties:
+                type: array
+                items:
+                  type: string
+            request_id:
+              type: string
+              description: Matches the X-Request-ID response header.
+  securitySchemes:
+    singleTokenAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: 'Shared deployment token, sent as `Authorization: token <token>`.'

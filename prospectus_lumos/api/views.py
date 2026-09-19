@@ -1,3 +1,5 @@
+from drf_spectacular.utils import OpenApiResponse, extend_schema
+
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import JSONRenderer
 from rest_framework.request import Request
@@ -18,11 +20,20 @@ class BaseAPIView(APIView):
     parser_classes: Tuple[Any, ...] = (JSONParser,)
 
 
+PING_SCHEMA = extend_schema(
+    summary="Liveness probe",
+    request=None,
+    responses={200: OpenApiResponse(response={"type": "object", "properties": {"status": {"type": "string"}}})},
+)
+
+
 class Ping(BaseAPIView):
     permission_classes = ()
 
+    @PING_SCHEMA
     def get(self, request: Request) -> Response:
         return Response({"status": "ok"})
 
+    @PING_SCHEMA
     def post(self, request: Request) -> Response:
         return Response({"status": "ok"})
