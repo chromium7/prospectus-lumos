@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 import sys
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 SETTINGS_DIR = Path(__file__).resolve().parent
@@ -21,8 +23,12 @@ SETTINGS_DIR = Path(__file__).resolve().parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-$_oa*lwe!5#65i0p5b(2ayk#kjh!*as1(72bq_nv909z76-+c)'
+# SECURITY WARNING: this development-only key is published in the repository.
+# Every real deployment must override SECRET_KEY in its own local_settings.py;
+# the check at the bottom of this module refuses to boot without DEBUG if it
+# has not been overridden.
+DEV_SECRET_KEY = 'django-insecure-development-only-do-not-use-in-production'
+SECRET_KEY = DEV_SECRET_KEY
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -182,6 +188,14 @@ try:
     from .local_settings import *  # noqa
 except ImportError:
     pass
+
+
+if not DEBUG and SECRET_KEY == DEV_SECRET_KEY:
+    raise ImproperlyConfigured(
+        'SECRET_KEY is still the published development key. Set a unique '
+        'SECRET_KEY in prospectus_lumos/local_settings.py before running with '
+        'DEBUG disabled. See local_settings.example.py.'
+    )
 
 
 if DEBUG:

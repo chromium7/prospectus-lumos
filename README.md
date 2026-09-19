@@ -198,21 +198,47 @@ python manage.py migrate <app> zero  # Reset specific app
 python manage.py migrate             # Reapply all migrations
 ```
 
+## Configuration
+
+All environments — development, CI, and production — are configured through
+`prospectus_lumos/local_settings.py`. It is gitignored and imported at the end
+of `settings.py`, so anything it defines overrides the defaults.
+
+Copy the template to get started:
+
+```bash
+cp prospectus_lumos/local_settings.example.py prospectus_lumos/local_settings.py
+```
+
+Development only needs the `DATABASES` entry; the defaults in `settings.py`
+cover everything else. The `SECRET_KEY` shipped in `settings.py` is a published
+development-only placeholder — running with `DEBUG = False` without overriding
+it raises `ImproperlyConfigured`.
+
 ## Production Deployment
 
-1. **Update settings for production:**
-   - Set `DEBUG = False`
-   - Configure proper database (PostgreSQL recommended)
-   - Set up static file serving
-   - Configure `ALLOWED_HOSTS`
+1. **Fill in the production section of `local_settings.py`:**
+   - `SECRET_KEY` — unique per deployment, never the committed placeholder
+   - `DEBUG = False`
+   - `ALLOWED_HOSTS`
+   - `DATABASES` (PostgreSQL recommended) and `CACHES`
+   - `GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE`, `GOOGLE_SHEET_API_KEY`, `GEMINI_API_KEY`
 
-2. **Environment variables:**
-   - `SECRET_KEY`
-   - Database credentials
-   - Google service account file path
+2. **Run Django's deployment checks:**
+   ```bash
+   python manage.py check --deploy
+   ```
+   A correctly configured host prints `System check identified no issues (0 silenced).`
+   Any `security.W*` warning names the setting still missing from
+   `local_settings.py`.
 
-3. **Security considerations:**
-   - Use HTTPS
+3. **Serve static files and use HTTPS:**
+   ```bash
+   python manage.py collectstatic
+   ```
+   Set `SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`, and `CSRF_COOKIE_SECURE`.
+
+4. **Security considerations:**
    - Secure file uploads
    - Regular backup of user data and credentials
 
