@@ -220,6 +220,7 @@ class ScenarioTimelineChartTests(TestCase):
         chart = timeline_chart_payload(self._save_version())
         point = chart["points"][0]
         self.assertTrue(point["balance_text"].startswith("Rp"))
+        self.assertRegex(point["label"], r"^[A-Z][a-z]{2} \d{4}$")
         self.assertTrue(point["target_text"].startswith("Rp"))
         self.assertIsInstance(point["balance"], float)
 

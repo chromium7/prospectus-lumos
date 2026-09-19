@@ -20,7 +20,7 @@
   }
 
   var labels = points.map(function (point) {
-    return point.date;
+    return point.label || point.date;
   });
 
   // Money is formatted on the server; the browser only positions the points.

@@ -299,9 +299,11 @@ def timeline_chart_payload(scenario: FreedomScenario) -> dict[str, Any]:
         balance = _decimal(row.get("closing_balance"))
         target = _decimal(row.get("target"))
         outflow = _decimal(row.get("event_outflow"))
+        point_date = _iso_to_date(row.get("date"))
         points.append(
             {
                 "date": row.get("date"),
+                "label": point_date.strftime("%b %Y") if point_date else str(row.get("date")),
                 "balance": float(balance),
                 "target": float(target),
                 "balance_text": idr(balance),
