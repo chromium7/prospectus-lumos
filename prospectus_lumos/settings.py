@@ -53,6 +53,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'prospectus_lumos.core.middleware.RequestIDMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -162,6 +163,38 @@ CACHES = {
 API_AUTHENTICATION_TOKEN = ''
 API_REQUIRES_HTTPS = True
 
+REST_FRAMEWORK = {
+    'EXCEPTION_HANDLER': 'prospectus_lumos.api.exceptions.api_exception_handler',
+}
+
+# Every log line carries the request's X-Request-ID so an error report can be
+# traced back to the response the client saw.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'filters': {
+        'request_id': {
+            '()': 'prospectus_lumos.core.request_id.RequestIDFilter',
+        },
+    },
+    'formatters': {
+        'standard': {
+            'format': '[%(asctime)s] %(levelname)s [%(request_id)s] %(name)s: %(message)s',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'filters': ['request_id'],
+            'formatter': 'standard',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+}
+
 # Google cloud credentials
 GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE = ''
 
@@ -172,6 +205,8 @@ TEST: bool = False
 if 'test' in sys.argv:
     TEST_RUNNER = 'prospectus_lumos.core.db_router.UnManagedModelTestRunner'
     TEST = True
+    # Expected 4xx responses would otherwise bury the test runner's output.
+    LOGGING['root']['level'] = 'CRITICAL'
 else:
     DATABASE_ROUTERS = [
         'prospectus_lumos.core.db_router.DBRouter',
