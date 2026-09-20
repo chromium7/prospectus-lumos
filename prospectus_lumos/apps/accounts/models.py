@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Any
 
 from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import FileExtensionValidator
+from django.utils import timezone
 
 
 class UserProfile(models.Model):
@@ -137,3 +139,52 @@ class Membership(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user.username} - {self.workspace.name} ({self.role})"
+
+
+class Invitation(models.Model):
+    """A one-time, time-limited offer of workspace membership.
+
+    The invitation link carries a random token that only the recipient ever sees; the database
+    stores its hash, so a leaked database dump cannot be turned back into usable links.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name="invitations")
+    email = models.EmailField(max_length=254, help_text="Normalized invitee address; lowercase and trimmed.")
+    role = models.CharField(max_length=10, choices=Membership.Role.choices, default=Membership.Role.VIEWER)
+    token_hash = models.CharField(
+        max_length=64, unique=True, help_text="SHA-256 hex digest of the token; the token itself is never stored."
+    )
+    invited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="sent_invitations"
+    )
+    expires_at = models.DateTimeField()
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=("workspace", "email"),
+                condition=models.Q(accepted_at__isnull=True, revoked_at__isnull=True),
+                name="invitation_active_workspace_email_uniq",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=("email", "expires_at"),
+                condition=models.Q(accepted_at__isnull=True, revoked_at__isnull=True),
+                name="invitation_active_email_idx",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.email} - {self.workspace.name} ({self.role})"
+
+    def is_usable(self, *, now: datetime | None = None) -> bool:
+        """Return whether the invitation may still be accepted at ``now``."""
+
+        return self.accepted_at is None and self.revoked_at is None and self.expires_at > (now or timezone.now())

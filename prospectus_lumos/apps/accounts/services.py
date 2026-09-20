@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+import hashlib
+import secrets
+from datetime import timedelta
+
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import QuerySet
+from django.utils import timezone
 
-from .models import Membership, Workspace
+from .models import Invitation, Membership, Workspace
+
+INVITATION_TTL = timedelta(days=7)
+INVITATION_TOKEN_BYTES = 32
 
 
 class MembershipNotFoundError(ValidationError):
@@ -129,3 +137,74 @@ def _assert_another_active_owner_remains(memberships: list[Membership], *, membe
         ):
             return
     raise LastOwnerError("A workspace must keep at least one active owner.")
+
+
+class InvitationInvalidError(ValidationError):
+    """Raised when an invitation token is unknown, expired, revoked, or already accepted."""
+
+
+def normalize_invitation_email(email: str) -> str:
+    """Return the address in the single form invitations are stored and looked up under."""
+
+    return email.strip().lower()
+
+
+def hash_invitation_token(token: str) -> str:
+    """Return the digest stored for a raw invitation token."""
+
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+@transaction.atomic
+def create_invitation(
+    *, workspace: Workspace, email: str, role: str, invited_by: User | None = None, ttl: timedelta = INVITATION_TTL
+) -> tuple[Invitation, str]:
+    """Issue an invitation and return it together with its raw token.
+
+    The raw token is returned once, for the caller to put in the invitation link, and is never
+    persisted. Re-inviting an address replaces the workspace's outstanding invitation for it, so
+    the previous link stops working as soon as a new one is sent.
+    """
+
+    normalized = normalize_invitation_email(email)
+    now = timezone.now()
+    Invitation.objects.filter(
+        workspace=workspace, email=normalized, accepted_at__isnull=True, revoked_at__isnull=True
+    ).update(revoked_at=now, updated_at=now)
+    token = secrets.token_urlsafe(INVITATION_TOKEN_BYTES)
+    invitation = Invitation(
+        workspace=workspace,
+        email=normalized,
+        role=role,
+        token_hash=hash_invitation_token(token),
+        invited_by=invited_by,
+        expires_at=now + ttl,
+    )
+    invitation.full_clean(exclude=("workspace", "invited_by"))
+    invitation.save()
+    return invitation, token
+
+
+def revoke_invitation(*, invitation: Invitation) -> Invitation:
+    """Mark the invitation unusable. Revoking an already-revoked invitation keeps the first time."""
+
+    if invitation.revoked_at is None:
+        invitation.revoked_at = timezone.now()
+        invitation.save(update_fields=("revoked_at", "updated_at"))
+    return invitation
+
+
+def verify_invitation(*, token: str, email: str | None = None) -> Invitation:
+    """Return the usable invitation the raw token identifies.
+
+    Raises ``InvitationInvalidError`` for an unknown, expired, revoked, or already-accepted
+    token, and for an address that does not match the invited one. Every rejection uses the same
+    message so a caller cannot probe which invitations exist.
+    """
+
+    invitation = Invitation.objects.filter(token_hash=hash_invitation_token(token)).select_related("workspace").first()
+    if invitation is None or not invitation.is_usable():
+        raise InvitationInvalidError("This invitation link is no longer valid.")
+    if email is not None and normalize_invitation_email(email) != invitation.email:
+        raise InvitationInvalidError("This invitation link is no longer valid.")
+    return invitation
