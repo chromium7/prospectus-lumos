@@ -32,6 +32,7 @@ from .forms import (
     ReviewStepForm,
     event_formset_values,
 )
+from .results import scenario_result_context
 
 WIZARD_STEPS = ((1, "Your goal"), (2, "Your money"), (3, "Life events"), (4, "Review"))
 
@@ -473,11 +474,18 @@ def scenario_detail_view(request: TypedHttpRequest, plan_id: int, scenario_id: i
     scenario = _owned_scenario(request, plan_id, scenario_id)
     if scenario.status != FreedomScenario.Status.SAVED:
         return redirect("freedom_plan_draft", plan_id=plan_id)
-    return render(
-        request,
-        "financial_planning/scenario_detail.html",
-        {"plan": scenario.plan, "scenario": scenario, "selected_tab": "financial_freedom"},
+    versions = list(
+        FreedomScenario.objects.filter(plan=scenario.plan, status=FreedomScenario.Status.SAVED).order_by("-version")
     )
+    context: dict[str, Any] = {
+        "plan": scenario.plan,
+        "scenario": scenario,
+        "versions": versions,
+        "has_draft": FreedomScenario.objects.filter(plan=scenario.plan, status=FreedomScenario.Status.DRAFT).exists(),
+        "selected_tab": "financial_freedom",
+    }
+    context.update(scenario_result_context(scenario))
+    return render(request, "financial_planning/scenario_detail.html", context)
 
 
 @login_required
