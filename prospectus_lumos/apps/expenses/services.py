@@ -5,6 +5,7 @@ from typing import List, Tuple, Dict, Any
 from decimal import Decimal
 
 from django.core.files.base import ContentFile
+from django.db.models import Sum
 from django.utils import timezone
 
 from libraries.google_cloud.backends import GoogleDriveBackend
@@ -258,6 +259,56 @@ class ExpenseAnalyzerService:
 
     def __init__(self, user: Any) -> None:
         self.user = user
+
+    def get_document_cashflow_analysis(
+        self,
+        *,
+        document_ids: list[int],
+        exclude_income_categories: list[str] | None = None,
+        exclude_expense_categories: list[str] | None = None,
+    ) -> Dict[str, Any]:
+        """Aggregate owned monthly documents with optional category exclusions.
+
+        Monthly document totals remain the canonical cash-flow totals used by the
+        Portfolio Analyzer. Exclusions subtract matching owned transactions, so
+        snapshot calculations stay consistent with that historical view.
+        """
+
+        documents = Document.objects.filter(user=self.user, id__in=document_ids)
+        totals = documents.aggregate(total_income=Sum("total_income"), total_expenses=Sum("total_expenses"))
+        income_total = totals["total_income"] or Decimal("0")
+        expense_total = totals["total_expenses"] or Decimal("0")
+        income_categories: Dict[str, Decimal] = {}
+        expense_categories: Dict[str, Decimal] = {}
+        transactions = (
+            Transaction.objects.filter(document__in=documents)
+            .values("transaction_type", "category")
+            .annotate(total=Sum("amount"))
+        )
+        for row in transactions:
+            category = row["category"] or "Uncategorized"
+            category_totals = (
+                income_categories
+                if row["transaction_type"] == Transaction.TransactionType.INCOME
+                else expense_categories
+            )
+            category_totals[category] = category_totals.get(category, Decimal("0")) + row["total"]
+
+        excluded_income = set(exclude_income_categories or ())
+        excluded_expenses = set(exclude_expense_categories or ())
+        income_total -= sum(
+            (income_categories.get(category, Decimal("0")) for category in excluded_income), Decimal("0")
+        )
+        expense_total -= sum(
+            (expense_categories.get(category, Decimal("0")) for category in excluded_expenses), Decimal("0")
+        )
+        return {
+            "total_income": income_total,
+            "total_expenses": expense_total,
+            "income_by_category": income_categories,
+            "expenses_by_category": expense_categories,
+            "document_count": documents.count(),
+        }
 
     def get_income_analysis(
         self,
