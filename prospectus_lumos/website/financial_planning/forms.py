@@ -5,9 +5,10 @@ from decimal import Decimal
 from typing import Any, cast
 
 from django import forms
+from django.forms import BaseInlineFormSet, inlineformset_factory
 from django.utils import timezone
 
-from prospectus_lumos.apps.financial_planning.models import FreedomPlan, FreedomScenario
+from prospectus_lumos.apps.financial_planning.models import FinancialEvent, FreedomPlan, FreedomScenario
 from prospectus_lumos.apps.financial_planning.services import ActualsSnapshotService
 
 MONEY_FIELDS = (
@@ -27,6 +28,90 @@ RATE_FIELDS = (
     "annual_contribution_growth_rate",
     "safety_buffer_rate",
 )
+MAX_EVENT_FORMS = 50
+
+EVENT_PRESETS: dict[str, dict[str, object]] = {
+    "car": {
+        "label": "Buy a car",
+        "name": "Car purchase",
+        "category": FinancialEvent.Category.CAR,
+        "one_time_amount": "300000000",
+        "recurring_monthly_amount": "5000000",
+        "duration_months": 36,
+        "amount_basis": FinancialEvent.AmountBasis.TODAY,
+        "funding_source": FinancialEvent.FundingSource.INVESTMENT_PORTFOLIO,
+    },
+    "home": {
+        "label": "Buy a home",
+        "name": "Home deposit",
+        "category": FinancialEvent.Category.HOME,
+        "one_time_amount": "500000000",
+        "recurring_monthly_amount": "0",
+        "duration_months": 0,
+        "amount_basis": FinancialEvent.AmountBasis.TODAY,
+        "funding_source": FinancialEvent.FundingSource.SEPARATE_SAVINGS,
+    },
+    "wedding": {
+        "label": "Plan a wedding",
+        "name": "Wedding",
+        "category": FinancialEvent.Category.WEDDING,
+        "one_time_amount": "200000000",
+        "recurring_monthly_amount": "0",
+        "duration_months": 0,
+        "amount_basis": FinancialEvent.AmountBasis.TODAY,
+        "funding_source": FinancialEvent.FundingSource.INVESTMENT_PORTFOLIO,
+    },
+    "education": {
+        "label": "Pay for education",
+        "name": "Education",
+        "category": FinancialEvent.Category.EDUCATION,
+        "one_time_amount": "250000000",
+        "recurring_monthly_amount": "0",
+        "duration_months": 0,
+        "amount_basis": FinancialEvent.AmountBasis.TODAY,
+        "funding_source": FinancialEvent.FundingSource.INVESTMENT_PORTFOLIO,
+    },
+    "business": {
+        "label": "Start a business",
+        "name": "Business",
+        "category": FinancialEvent.Category.BUSINESS,
+        "one_time_amount": "300000000",
+        "recurring_monthly_amount": "0",
+        "duration_months": 0,
+        "amount_basis": FinancialEvent.AmountBasis.TODAY,
+        "funding_source": FinancialEvent.FundingSource.INVESTMENT_PORTFOLIO,
+    },
+    "medical": {
+        "label": "Medical reserve",
+        "name": "Medical reserve",
+        "category": FinancialEvent.Category.MEDICAL,
+        "one_time_amount": "100000000",
+        "recurring_monthly_amount": "0",
+        "duration_months": 0,
+        "amount_basis": FinancialEvent.AmountBasis.TODAY,
+        "funding_source": FinancialEvent.FundingSource.SEPARATE_SAVINGS,
+    },
+    "family": {
+        "label": "Support family",
+        "name": "Family support",
+        "category": FinancialEvent.Category.FAMILY,
+        "one_time_amount": "0",
+        "recurring_monthly_amount": "5000000",
+        "duration_months": 12,
+        "amount_basis": FinancialEvent.AmountBasis.TODAY,
+        "funding_source": FinancialEvent.FundingSource.SEPARATE_SAVINGS,
+    },
+    "custom": {
+        "label": "Something else",
+        "name": "My future plan",
+        "category": FinancialEvent.Category.CUSTOM,
+        "one_time_amount": "0",
+        "recurring_monthly_amount": "0",
+        "duration_months": 0,
+        "amount_basis": FinancialEvent.AmountBasis.TODAY,
+        "funding_source": FinancialEvent.FundingSource.INVESTMENT_PORTFOLIO,
+    },
+}
 
 
 class FreedomPlanForm(forms.ModelForm):
@@ -356,3 +441,115 @@ class ActualsSnapshotForm(forms.Form):
             "excluded_income_categories": self.cleaned_data["excluded_income_categories"],
             "excluded_expense_categories": self.cleaned_data["excluded_expense_categories"],
         }
+
+
+class FinancialEventForm(forms.ModelForm):
+    """Validate one future life event while keeping advanced fields optional to understand."""
+
+    class Meta:
+        model = FinancialEvent
+        fields = (
+            "name",
+            "category",
+            "event_date",
+            "one_time_amount",
+            "amount_basis",
+            "recurring_monthly_amount",
+            "recurring_end_date",
+            "funding_source",
+            "sort_order",
+            "notes",
+        )
+        widgets = {
+            "name": forms.TextInput(attrs={"class": "form-control"}),
+            "category": forms.Select(attrs={"class": "form-select"}),
+            "event_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            "one_time_amount": forms.NumberInput(attrs={"class": "form-control", "inputmode": "decimal"}),
+            "amount_basis": forms.Select(attrs={"class": "form-select"}),
+            "recurring_monthly_amount": forms.NumberInput(attrs={"class": "form-control", "inputmode": "decimal"}),
+            "recurring_end_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            "funding_source": forms.Select(attrs={"class": "form-select"}),
+            "sort_order": forms.HiddenInput(),
+            "notes": forms.TextInput(attrs={"class": "form-control"}),
+        }
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        for field_name in ("one_time_amount", "recurring_monthly_amount", "sort_order"):
+            self.fields[field_name].required = False
+        self.fields["one_time_amount"].initial = self.initial.get("one_time_amount", Decimal("0"))
+        self.fields["recurring_monthly_amount"].initial = self.initial.get("recurring_monthly_amount", Decimal("0"))
+        self.fields["sort_order"].initial = self.initial.get("sort_order", 0)
+        funding_source_field = cast(forms.ChoiceField, self.fields["funding_source"])
+        funding_source_field.choices = (
+            (FinancialEvent.FundingSource.INVESTMENT_PORTFOLIO, "Use the investments in this plan"),
+            (FinancialEvent.FundingSource.SEPARATE_SAVINGS, "Save for it separately"),
+        )
+
+    def clean(self) -> dict[str, Any]:
+        cleaned_data = super().clean()
+        if self.errors:
+            return cleaned_data
+        one_time = cleaned_data.get("one_time_amount") or Decimal("0")
+        recurring = cleaned_data.get("recurring_monthly_amount") or Decimal("0")
+        cleaned_data["one_time_amount"] = one_time
+        cleaned_data["recurring_monthly_amount"] = recurring
+        cleaned_data["sort_order"] = cleaned_data.get("sort_order") or 0
+        if one_time <= 0 and recurring <= 0:
+            raise forms.ValidationError("Enter a one-time amount or a monthly amount.", code="empty_event")
+        if recurring > 0 and not cleaned_data.get("recurring_end_date"):
+            self.add_error(
+                "recurring_end_date",
+                forms.ValidationError("Tell us when the monthly cost ends.", code="missing_recurring_end"),
+            )
+        return cleaned_data
+
+
+class BaseFinancialEventFormSet(BaseInlineFormSet):
+    """Enforce the event cap and future-date rule across rows."""
+
+    def __init__(self, *args: Any, calculation_date: date | None = None, **kwargs: Any) -> None:
+        self.calculation_date = calculation_date
+        super().__init__(*args, **kwargs)
+
+    def clean(self) -> None:
+        super().clean()
+        if any(self.errors):
+            return
+        active_forms = [form for form in self.forms if form.cleaned_data and not form.cleaned_data.get("DELETE", False)]
+        if len(active_forms) > MAX_EVENT_FORMS:
+            raise forms.ValidationError(f"At most {MAX_EVENT_FORMS} life events are supported.", code="too_many_events")
+        if self.calculation_date:
+            for form in active_forms:
+                event_date = form.cleaned_data.get("event_date")
+                if event_date and event_date <= self.calculation_date:
+                    form.add_error(
+                        "event_date",
+                        forms.ValidationError("Choose a future date for this plan.", code="event_not_future"),
+                    )
+
+
+FinancialEventFormSet = inlineformset_factory(
+    FreedomScenario,
+    FinancialEvent,
+    form=FinancialEventForm,
+    formset=BaseFinancialEventFormSet,
+    extra=1,
+    can_delete=True,
+    max_num=MAX_EVENT_FORMS,
+    validate_max=True,
+)
+
+
+def event_formset_values(formset: BaseFinancialEventFormSet) -> list[dict[str, Any]]:
+    """Return active event rows in explicit stable display order."""
+
+    rows = [form.cleaned_data for form in formset.forms if form.cleaned_data and not form.cleaned_data.get("DELETE")]
+    rows.sort(key=lambda row: row.get("sort_order") or 0)
+    return [
+        {
+            **{field: row[field] for field in FinancialEventForm.Meta.fields},
+            "sort_order": sort_order,
+        }
+        for sort_order, row in enumerate(rows)
+    ]

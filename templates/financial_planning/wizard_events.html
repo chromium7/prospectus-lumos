@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Life events - Prospectus Lumos{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/financial_planning.css' %}">{% endblock %}
+
+{% block content %}
+<div class="wizard-shell">
+  <a class="small text-decoration-none" href="{% url 'freedom_plan_list' %}"><i class="bi bi-arrow-left"></i> Save and leave</a>
+  <div class="mt-3">{% include "financial_planning/partials/wizard_steps.html" with wizard_steps=wizard_steps %}</div>
+
+  <header class="mb-4">
+    <p class="text-primary fw-semibold mb-2">Step 3 of 4 · Life events</p>
+    <h1 class="h2 mb-2">What big plans might happen along the way?</h1>
+    <p class="text-muted mb-0">This step is optional. Pick a starting point and change the rough amount—we will show how it affects your goal.</p>
+  </header>
+
+  <form method="post" novalidate data-event-formset data-max-events="50">
+    {% csrf_token %}
+    {{ event_formset.management_form }}
+    {{ event_presets|json_script:"event-presets" }}
+    {% if event_formset.non_form_errors %}<div class="alert alert-danger">{{ event_formset.non_form_errors }}</div>{% endif %}
+
+    <section class="card shadow-sm mb-4">
+      <div class="card-body p-4">
+        <h2 class="h5">Choose a common plan</h2>
+        <p class="small text-muted">These are editable examples, not recommendations.</p>
+        <div class="d-flex flex-wrap gap-2">
+          {% for key, preset in event_presets.items %}<button class="btn btn-outline-primary" type="button" data-event-preset="{{ key }}">{{ preset.label }}</button>{% endfor %}
+        </div>
+      </div>
+    </section>
+
+    <div data-event-list>
+      {% for event_form in event_formset.forms %}
+        {% include "financial_planning/partials/wizard_event_form.html" with event_number=forloop.counter %}
+      {% endfor %}
+    </div>
+    <template data-event-template>{% include "financial_planning/partials/wizard_event_form.html" with event_form=event_formset.empty_form event_number="#" %}</template>
+
+    <div class="d-flex flex-wrap justify-content-between gap-2 mb-4">
+      <button class="btn btn-outline-primary" type="button" data-event-add><i class="bi bi-plus-lg me-1"></i>Add another plan</button>
+      <button class="btn btn-link text-muted" type="submit" name="action" value="skip_events">I do not have any big plans to add</button>
+    </div>
+
+    <div class="d-flex justify-content-between">
+      <a class="btn btn-outline-secondary" href="{% url 'freedom_plan_money' plan.id %}"><i class="bi bi-arrow-left me-1"></i> Back</a>
+      <button class="btn btn-primary" type="submit">Review my plan <i class="bi bi-arrow-right ms-1"></i></button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}<script src="{% static 'js/financial_planning_events.js' %}"></script>{% endblock %}
