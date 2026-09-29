@@ -137,6 +137,23 @@ body {
   color: var(--muted-text) !important;
 }
 
+/* List groups follow the card surface instead of Bootstrap's light default */
+.dark .list-group-item {
+  background-color: transparent;
+  color: var(--text-color);
+  border-color: var(--border-color);
+}
+
+.dark .table caption,
+.dark .progress {
+  color: var(--muted-text);
+  background-color: var(--card-bg);
+}
+
+.dark details > summary {
+  color: var(--text-color);
+}
+
 /* Sidebar interactions in dark mode */
 .dark .sidebar .nav-link:hover {
   background-color: #111827;

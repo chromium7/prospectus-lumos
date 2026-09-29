@@ -18,6 +18,7 @@ The project is organized into separate Django apps for better modularity:
 - 📊 Google Sheets integration for automatic data import
 - 📝 CSV export and management
 - 📈 Income and expense analysis with filtering
+- 🧭 Financial Freedom planner: a guided four-step plan with saved, immutable versions
 - 📱 Responsive web interface with Bootstrap
 - 🎛️ Django admin interface for data management
 
