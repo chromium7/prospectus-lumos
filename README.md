@@ -115,33 +115,6 @@ Main application logic:
 - Download CSV files
 - Pagination for large datasets
 
-#### Financial Freedom Planner
-Written for people who do not think of themselves as financially literate: each step
-asks a few ordinary questions, every field explains itself, and safe defaults mean a
-usable answer without touching a single assumption.
-
-- **Four guided steps**: your goal, your money, optional life events, then a review.
-- **Start from tracked money**: step two can prefill from the user's own complete months
-  of imported history and shows which months it used; the values stay editable and a
-  fully manual route always exists.
-- **Life events**: preset-led plans (car, home, wedding, education, medical, family
-  support) that are either paid from investments or saved for separately.
-- **Saved versions are immutable**: saving freezes the inputs, assumptions, and the full
-  projection payload, so a later document sync or transaction edit cannot change a plan
-  that was already saved.
-- **Result page**: the plain-language answer first, then headline figures, a Chart.js
-  timeline, the target breakdown, a conservative/base/optimistic range stated without
-  probability claims, the life-event schedule, a year-by-year table, and only then the
-  assumptions. Everything essential is readable without the chart.
-- **Version comparison**: two saved versions of one plan side by side, with a freedom
-  date that moves earlier read as easier and later as harder.
-
-All financial maths runs server side in `prospectus_lumos/apps/financial_planning/calculator.py`,
-which has no Django dependency; `docs/financial_freedom/CALCULATION_CONTRACT.md` records the
-month conventions, rounding, solver bounds, and `calculation_version`. Chart data reaches the
-browser through `json_script` with amounts already formatted, so the browser never re-derives a
-money value. Every route, queryset, and preview is scoped to the requesting user.
-
 ## Google Drive Setup
 
 To use Google Drive integration:
