@@ -296,11 +296,19 @@ class ExpenseAnalyzerService:
 
         excluded_income = set(exclude_income_categories or ())
         excluded_expenses = set(exclude_expense_categories or ())
-        income_total -= sum(
-            (income_categories.get(category, Decimal("0")) for category in excluded_income), Decimal("0")
+        # Document header totals and transaction rows are stored independently, so a
+        # re-imported or manually adjusted month can hold transactions worth more than
+        # its header total. Clamp at zero rather than hand a negative cash-flow total to
+        # callers that prefill money fields from it.
+        income_total = max(
+            Decimal("0"),
+            income_total
+            - sum((income_categories.get(category, Decimal("0")) for category in excluded_income), Decimal("0")),
         )
-        expense_total -= sum(
-            (expense_categories.get(category, Decimal("0")) for category in excluded_expenses), Decimal("0")
+        expense_total = max(
+            Decimal("0"),
+            expense_total
+            - sum((expense_categories.get(category, Decimal("0")) for category in excluded_expenses), Decimal("0")),
         )
         return {
             "total_income": income_total,

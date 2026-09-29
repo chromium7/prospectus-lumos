@@ -98,7 +98,13 @@ class ActualsSnapshot:
         return len(self.represented_months)
 
     def scenario_values(self) -> dict[str, object]:
-        """Return editable suggestions plus frozen source metadata."""
+        """Return editable suggestions plus frozen source metadata.
+
+        Only fields the money step actually collects appear here. The lifestyle target
+        belongs to the goal step, so tracked actuals deliberately leave
+        ``desired_monthly_lifestyle`` alone rather than advertise a suggestion the
+        money step would silently drop.
+        """
 
         return {
             "source_mode": FreedomScenario.SourceMode.TRACKED_ACTUALS,
@@ -110,7 +116,6 @@ class ActualsSnapshot:
             "current_monthly_income": self.average_income,
             "current_monthly_expenses": self.average_expenses,
             "current_monthly_investment": max(Decimal("0"), self.average_net_savings),
-            "desired_monthly_lifestyle": self.average_expenses,
         }
 
     def to_payload(self) -> dict[str, object]:

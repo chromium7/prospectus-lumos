@@ -47,7 +47,7 @@
       {% if actuals_snapshot %}
         <div class="alert alert-info">
           <strong>Estimate loaded from {{ actuals_snapshot.month_count }} represented complete month{{ actuals_snapshot.month_count|pluralize }}.</strong>
-          {% if actuals_snapshot.period_start and actuals_snapshot.period_end %}<div class="small">Source period: {{ actuals_snapshot.period_start|date:"M Y" }} to {{ actuals_snapshot.period_end|date:"M Y" }}.</div>{% endif %}
+          {% if actuals_snapshot.source_period_start and actuals_snapshot.source_period_end %}<div class="small">Source period: {{ actuals_snapshot.source_period_start|date:"M Y" }} to {{ actuals_snapshot.source_period_end|date:"M Y" }}.</div>{% endif %}
           {% for warning in actuals_snapshot.warnings %}<div class="small">{{ warning }}</div>{% endfor %}
         </div>
       {% endif %}
