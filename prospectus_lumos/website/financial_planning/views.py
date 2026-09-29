@@ -14,7 +14,9 @@ from prospectus_lumos.apps.financial_planning.services import (
 )
 from prospectus_lumos.core.utils import TypedHttpRequest
 
-from .forms import FreedomPlanForm, FreedomScenarioForm
+from .forms import FreedomPlanForm, FreedomScenarioForm, GoalStepForm
+
+WIZARD_STEPS = ((1, "Your goal"), (2, "Your money"), (3, "Life events"), (4, "Review"))
 
 
 def _owned_plan(request: TypedHttpRequest, plan_id: int) -> FreedomPlan:
@@ -85,22 +87,64 @@ def plan_list_view(request: TypedHttpRequest) -> HttpResponse:
 @login_required
 @require_http_methods(["GET", "POST"])
 def plan_create_view(request: TypedHttpRequest) -> HttpResponse:
-    """Create a manual plan and calculated editable draft."""
+    """Start a plan with one approachable page about the user's goal."""
 
     plan_form = FreedomPlanForm(request.POST or None)
-    scenario_form = FreedomScenarioForm(request.POST or None, initial=FreedomScenarioForm.initial_values())
-    if request.method == "POST" and plan_form.is_valid() and scenario_form.is_valid():
+    initial = FreedomScenarioForm.initial_values()
+    goal_form = GoalStepForm(request.POST or None, initial=initial)
+    if request.method == "POST" and plan_form.is_valid() and goal_form.is_valid():
         draft = FreedomScenarioService().create_plan_with_draft(
             user=request.user,
             plan_data=plan_form.cleaned_data,
-            scenario_data=scenario_form.scenario_values(),
+            scenario_data={**initial, **goal_form.scenario_values()},
         )
-        messages.success(request, "Plan created. Review the estimate, then save when you are ready.")
+        messages.success(request, "Great start. Next, tell us what your money looks like today.")
         return redirect("freedom_plan_draft", plan_id=draft.plan_id)
     return render(
         request,
-        "financial_planning/plan_builder.html",
-        _builder_context(plan=None, draft=None, form=scenario_form, plan_form=plan_form),
+        "financial_planning/wizard_goal.html",
+        {
+            "plan": None,
+            "plan_form": plan_form,
+            "goal_form": goal_form,
+            "current_step": 1,
+            "wizard_steps": WIZARD_STEPS,
+            "selected_tab": "financial_freedom",
+        },
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def plan_goal_view(request: TypedHttpRequest, plan_id: int) -> HttpResponse:
+    """Edit the goal page for an owned draft without exposing other inputs."""
+
+    plan = _owned_plan(request, plan_id)
+    draft = get_object_or_404(FreedomScenario, plan=plan, status=FreedomScenario.Status.DRAFT)
+    plan_form = FreedomPlanForm(request.POST or None, instance=plan)
+    goal_form = GoalStepForm(request.POST or None, instance=draft)
+    if request.method == "POST" and plan_form.is_valid() and goal_form.is_valid():
+        updated_plan = plan_form.save(commit=False)
+        updated_plan.user = request.user
+        updated_plan.save(update_fields=("name", "description", "updated_at"))
+        FreedomScenarioService().update_draft(
+            user=request.user,
+            draft=draft,
+            scenario_data=goal_form.scenario_values(),
+        )
+        messages.success(request, "Your goal is updated.")
+        return redirect("freedom_plan_draft", plan_id=plan.pk)
+    return render(
+        request,
+        "financial_planning/wizard_goal.html",
+        {
+            "plan": plan,
+            "plan_form": plan_form,
+            "goal_form": goal_form,
+            "current_step": 1,
+            "wizard_steps": WIZARD_STEPS,
+            "selected_tab": "financial_freedom",
+        },
     )
 
 

@@ -29,6 +29,56 @@
     padding: 0;
 }
 
+.wizard-shell {
+    margin: 0 auto;
+    max-width: 54rem;
+}
+
+.wizard-steps {
+    display: grid;
+    gap: .5rem;
+    grid-template-columns: repeat(4, 1fr);
+}
+
+.wizard-step {
+    align-items: center;
+    color: var(--bs-secondary-color);
+    display: flex;
+    font-size: .8rem;
+    gap: .4rem;
+}
+
+.wizard-step-number {
+    align-items: center;
+    background: var(--bs-tertiary-bg);
+    border-radius: 50%;
+    display: inline-flex;
+    height: 1.7rem;
+    justify-content: center;
+    width: 1.7rem;
+}
+
+.wizard-step.is-current {
+    color: var(--bs-primary);
+    font-weight: 700;
+}
+
+.wizard-step.is-current .wizard-step-number,
+.wizard-step.is-complete .wizard-step-number {
+    background: var(--bs-primary);
+    color: var(--bs-white);
+}
+
+@media (max-width: 575.98px) {
+    .wizard-step {
+        justify-content: center;
+    }
+
+    .wizard-step > span:last-child {
+        display: none;
+    }
+}
+
 details.card > summary {
     cursor: pointer;
 }
