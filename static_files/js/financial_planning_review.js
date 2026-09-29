@@ -10,9 +10,12 @@
     const state = form.querySelector("[data-preview-state]");
     const error = document.querySelector("[data-preview-error]");
 
-    function rupiah(value) {
-        if (value === null || value === undefined) return "Outside estimate range";
-        return `Rp ${Math.round(Number(value)).toLocaleString("id-ID")}`;
+    // Money arrives pre-formatted from the server so the browser never re-derives or re-rounds it;
+    // re-formatting here would disagree with the server-rendered `|idr` values on the same screen,
+    // and Number() would silently lose precision on targets above Number.MAX_SAFE_INTEGER.
+    function rupiah(text) {
+        if (text === null || text === undefined || text === "") return "Outside estimate range";
+        return text;
     }
 
     function setText(selector, value) {
@@ -32,9 +35,9 @@
             const target = document.createElement("td");
             year.textContent = row.date.slice(0, 4);
             balance.className = "text-end";
-            balance.textContent = rupiah(row.closing_balance);
+            balance.textContent = rupiah(row.closing_balance_text);
             target.className = "text-end";
-            target.textContent = rupiah(row.target);
+            target.textContent = rupiah(row.target_text);
             tr.append(year, balance, target);
             return tr;
         }));
@@ -50,7 +53,7 @@
         container.replaceChildren(...items.map((item) => {
             const line = document.createElement("p");
             line.className = "mb-2";
-            line.textContent = `${item.name}: save about ${rupiah(item.monthly_funding_need)} a month separately by ${item.event_date}.`;
+            line.textContent = `${item.name}: save about ${rupiah(item.monthly_funding_need_text)} a month separately by ${item.event_date}.`;
             return line;
         }));
     }
@@ -74,8 +77,8 @@
             const result = await response.json();
             if (sequence !== previewSequence || result.request_id !== String(sequence)) return;
             if (!response.ok || !result.ok) throw new Error("Preview validation failed");
-            setText("[data-preview-required]", rupiah(result.summary.required_monthly_investment));
-            setText("[data-preview-target]", rupiah(result.summary.total_target));
+            setText("[data-preview-required]", rupiah(result.summary.required_monthly_investment_text));
+            setText("[data-preview-target]", rupiah(result.summary.total_target_text));
             setText("[data-preview-date]", result.summary.projected_achievement_date || "Not reached in this estimate");
             setText("[data-preview-progress]", `${result.summary.progress_percent}%`);
             updateTimeline(result.timeline);

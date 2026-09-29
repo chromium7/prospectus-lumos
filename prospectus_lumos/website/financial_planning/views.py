@@ -34,7 +34,7 @@ from .forms import (
     event_formset_values,
 )
 from .comparison import compare_scenarios
-from .results import STATUS_COPY, scenario_result_context, timeline_chart_payload, timeline_summary
+from .results import STATUS_COPY, money_text, scenario_result_context, timeline_chart_payload, timeline_summary
 
 WIZARD_STEPS = ((1, "Your goal"), (2, "Your money"), (3, "Life events"), (4, "Review"))
 
@@ -408,10 +408,16 @@ def calculate_preview_view(request: TypedHttpRequest) -> JsonResponse:
             "calculation_version": payload["calculation_version"],
             "summary": {
                 "base_freedom_number": payload["target_breakdown"]["base_freedom_number_today"],
+                "base_freedom_number_text": money_text(payload["target_breakdown"]["base_freedom_number_today"]),
                 "total_target": payload["target_breakdown"]["total_target"],
+                "total_target_text": money_text(payload["target_breakdown"]["total_target"]),
                 "required_monthly_investment": base_case["required_contribution"]["monthly_contribution"],
+                "required_monthly_investment_text": money_text(
+                    base_case["required_contribution"]["monthly_contribution"]
+                ),
                 "projected_achievement_date": base_case["achievement"]["date"],
                 "funding_gap": payload["funding_gap"],
+                "funding_gap_text": money_text(payload["funding_gap"]),
                 "progress_percent": payload["progress_percent"],
                 "status": payload["status"],
             },
@@ -419,12 +425,17 @@ def calculate_preview_view(request: TypedHttpRequest) -> JsonResponse:
                 {
                     "date": row["date"],
                     "closing_balance": row["closing_balance"],
+                    "closing_balance_text": money_text(row["closing_balance"]),
                     "target": row["target"],
+                    "target_text": money_text(row["target"]),
                     "event_outflow": row["event_outflow"],
                 }
                 for row in payload["monthly"]
             ],
-            "separate_savings": payload["separate_savings"],
+            "separate_savings": [
+                {**item, "monthly_funding_need_text": money_text(item.get("monthly_funding_need"))}
+                for item in payload["separate_savings"]
+            ],
             "warnings": payload["warnings"],
         }
     )
