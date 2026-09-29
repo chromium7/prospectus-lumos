@@ -618,3 +618,35 @@ class ReviewStepForm(forms.ModelForm):
         """Return validated assumptions for update or transient preview."""
 
         return {field_name: self.cleaned_data[field_name] for field_name in self.Meta.fields}
+
+
+class ScenarioCompareForm(forms.Form):
+    """Pick two saved versions of one owned plan to place side by side."""
+
+    left = forms.ModelChoiceField(queryset=FreedomScenario.objects.none(), label="Earlier version")
+    right = forms.ModelChoiceField(queryset=FreedomScenario.objects.none(), label="Newer version")
+
+    def __init__(self, *args: Any, plan: FreedomPlan, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        # Scoping the queryset to this plan's saved versions is what keeps another user's
+        # scenario id from ever resolving, whatever the query string says.
+        saved = FreedomScenario.objects.filter(plan=plan, status=FreedomScenario.Status.SAVED).order_by("-version")
+        for field_name in ("left", "right"):
+            self.fields[field_name].queryset = saved  # type: ignore[attr-defined]
+            self.fields[field_name].widget.attrs["class"] = "form-select"
+            self.fields[field_name].empty_label = "Choose a version"  # type: ignore[attr-defined]
+
+    def clean(self) -> dict[str, Any]:
+        cleaned_data = super().clean()
+        left = cleaned_data.get("left")
+        right = cleaned_data.get("right")
+        if left and right and left.pk == right.pk:
+            self.add_error("right", forms.ValidationError("Choose two different versions.", code="same_version"))
+        return cleaned_data
+
+    def ordered_pair(self) -> tuple[FreedomScenario, FreedomScenario]:
+        """Return the pair oldest first, so "newer" always means the later version."""
+
+        left = self.cleaned_data["left"]
+        right = self.cleaned_data["right"]
+        return (left, right) if left.version <= right.version else (right, left)

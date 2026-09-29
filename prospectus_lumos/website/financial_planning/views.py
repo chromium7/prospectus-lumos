@@ -30,8 +30,10 @@ from .forms import (
     GoalStepForm,
     MoneyStepForm,
     ReviewStepForm,
+    ScenarioCompareForm,
     event_formset_values,
 )
+from .comparison import compare_scenarios
 from .results import scenario_result_context, timeline_chart_payload, timeline_summary
 
 WIZARD_STEPS = ((1, "Your goal"), (2, "Your money"), (3, "Life events"), (4, "Review"))
@@ -489,6 +491,27 @@ def scenario_detail_view(request: TypedHttpRequest, plan_id: int, scenario_id: i
     context["chart_data"] = chart_data
     context["chart_summary"] = timeline_summary(scenario, chart_data)
     return render(request, "financial_planning/scenario_detail.html", context)
+
+
+@login_required
+@require_GET
+def scenario_compare_view(request: TypedHttpRequest, plan_id: int) -> HttpResponse:
+    """Place two saved versions of one owned plan side by side without changing either."""
+
+    plan = _owned_plan(request, plan_id)
+    saved = list(FreedomScenario.objects.filter(plan=plan, status=FreedomScenario.Status.SAVED).order_by("-version"))
+    form = ScenarioCompareForm(request.GET or None, plan=plan)
+    context: dict[str, Any] = {
+        "plan": plan,
+        "form": form,
+        "saved_versions": saved,
+        "comparison": None,
+        "selected_tab": "financial_freedom",
+    }
+    if request.GET and form.is_valid():
+        older, newer = form.ordered_pair()
+        context["comparison"] = compare_scenarios(older, newer)
+    return render(request, "financial_planning/scenario_compare.html", context)
 
 
 @login_required
