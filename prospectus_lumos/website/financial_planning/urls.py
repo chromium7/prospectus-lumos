@@ -8,6 +8,8 @@ urlpatterns = [
     path("<int:plan_id>/goal/", views.plan_goal_view, name="freedom_plan_goal"),
     path("<int:plan_id>/money/", views.plan_money_view, name="freedom_plan_money"),
     path("<int:plan_id>/events/", views.plan_events_view, name="freedom_plan_events"),
+    path("<int:plan_id>/review/", views.plan_review_view, name="freedom_plan_review"),
+    path("calculate-preview/", views.calculate_preview_view, name="freedom_calculate_preview"),
     path("<int:plan_id>/draft/", views.plan_draft_view, name="freedom_plan_draft"),
     path("<int:plan_id>/save/", views.plan_save_view, name="freedom_plan_save"),
     path(

@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% load static formatting %}
+
+{% block title %}Review your plan - Prospectus Lumos{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/financial_planning.css' %}">{% endblock %}
+
+{% block content %}
+<div class="wizard-review-shell">
+  <a class="small text-decoration-none" href="{% url 'freedom_plan_list' %}"><i class="bi bi-arrow-left"></i> Save and leave</a>
+  <div class="mt-3">{% include "financial_planning/partials/wizard_steps.html" with wizard_steps=wizard_steps %}</div>
+
+  <header class="mb-4">
+    <p class="text-primary fw-semibold mb-2">Step 4 of 4 · Review</p>
+    <h1 class="h2 mb-2">Here is your first estimate</h1>
+    <p class="text-muted mb-0">This is a direction, not a verdict. Start with the monthly action, then explore the details only if they are useful.</p>
+  </header>
+
+  <div class="wizard-review-layout">
+    <div>
+      <section class="card shadow-sm mb-4">
+        <div class="card-body p-4">
+          <h2 class="h5">What this means</h2>
+          <p>To aim for <strong>{{ draft.desired_monthly_lifestyle|idr }} a month</strong> from {{ draft.target_date|date:"F Y" }}, this estimate suggests building investments worth about <strong data-preview-target>{{ draft.total_target|idr }}</strong>.</p>
+          {% if draft.required_monthly_investment is not None %}
+            <p class="mb-0">You currently invest {{ draft.current_monthly_investment|idr }} a month. The estimate suggests <strong data-preview-required>{{ draft.required_monthly_investment|idr }}</strong>{% if monthly_increase %}, which is {{ monthly_increase|idr }} more than today{% endif %}.</p>
+          {% else %}
+            <p class="mb-0">This goal falls outside the calculator’s contribution range. Try a later date or a smaller monthly lifestyle.</p>
+          {% endif %}
+        </div>
+      </section>
+
+      {% if draft.events.exists %}
+      <section class="card shadow-sm mb-4"><div class="card-body p-4">
+        <div class="d-flex justify-content-between gap-3"><div><h2 class="h5 mb-1">Plans included along the way</h2><p class="small text-muted">Plans funded from investments affect the estimate. Separate savings stay outside it.</p></div><a class="small" href="{% url 'freedom_plan_events' plan.id %}">Edit</a></div>
+        <ul class="list-group list-group-flush">{% for event in draft.events.all %}<li class="list-group-item px-0 d-flex justify-content-between gap-3"><span><strong>{{ event.name }}</strong><br><small class="text-muted">{{ event.event_date|date:"M Y" }} · {{ event.get_funding_source_display }}</small></span><span>{{ event.one_time_amount|idr }}</span></li>{% endfor %}</ul>
+      </div></section>
+      {% endif %}
+
+      <section class="card shadow-sm mb-4"><div class="card-body p-4">
+        <h2 class="h5">How the investment could grow</h2>
+        <p class="small text-muted">Five-year checkpoints based on the assumptions below. Real markets will not move this smoothly.</p>
+        <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Year</th><th class="text-end">Estimated investments</th><th class="text-end">Target at that time</th></tr></thead><tbody data-preview-timeline>{% for row in timeline %}<tr><td>{{ row.date|slice:":4" }}</td><td class="text-end">{{ row.closing_balance|idr }}</td><td class="text-end">{{ row.target|idr }}</td></tr>{% empty %}<tr><td colspan="3">No timeline is available.</td></tr>{% endfor %}</tbody></table></div>
+      </div></section>
+
+      <section class="card shadow-sm mb-4"><div class="card-body p-4">
+        <h2 class="h5">Savings kept separate</h2>
+        <div data-preview-separate>{% for item in separate_savings %}<p class="mb-2"><strong>{{ item.name }}</strong>: save about {{ item.monthly_funding_need|idr }} a month separately by {{ item.event_date }}.</p>{% empty %}<p class="text-muted mb-0">You did not mark any future plans for separate savings.</p>{% endfor %}</div>
+      </div></section>
+
+      <form method="post" class="card shadow-sm mb-4" data-review-form data-preview-url="{% url 'freedom_calculate_preview' %}" data-plan-id="{{ plan.id }}" novalidate>
+        {% csrf_token %}
+        <div class="card-body p-4">
+          <details{% if review_form.errors %} open{% endif %}>
+            <summary class="h5 mb-0">How we estimated this <span class="small text-muted fw-normal">(optional)</span></summary>
+            <p class="small text-muted mt-2">These starting assumptions are already filled in. You do not need to change them to finish your plan.</p>
+            {% if review_form.errors %}<div class="alert alert-danger">Please check the highlighted assumptions.{{ review_form.non_field_errors }}</div>{% endif %}
+            <div class="row g-3 mt-1">
+              <div class="col-md-6"><label class="form-label" for="{{ review_form.annual_return_rate.id_for_label }}">How fast investments might grow each year</label><div class="input-group">{{ review_form.annual_return_rate }}<span class="input-group-text">%</span></div>{{ review_form.annual_return_rate.errors }}</div>
+              <div class="col-md-6"><label class="form-label" for="{{ review_form.annual_inflation_rate.id_for_label }}">How fast prices might rise each year</label><div class="input-group">{{ review_form.annual_inflation_rate }}<span class="input-group-text">%</span></div>{{ review_form.annual_inflation_rate.errors }}</div>
+              <div class="col-md-6"><label class="form-label" for="{{ review_form.withdrawal_rate.id_for_label }}">How much of the fund may be spent each year</label><div class="input-group">{{ review_form.withdrawal_rate }}<span class="input-group-text">%</span></div>{{ review_form.withdrawal_rate.errors }}</div>
+              <div class="col-md-6"><label class="form-label" for="{{ review_form.safety_buffer_rate.id_for_label }}">Extra cushion added to the target</label><div class="input-group">{{ review_form.safety_buffer_rate }}<span class="input-group-text">%</span></div>{{ review_form.safety_buffer_rate.errors }}</div>
+              <div class="col-md-6"><label class="form-label" for="{{ review_form.annual_income_growth_rate.id_for_label }}">Possible yearly income growth</label><div class="input-group">{{ review_form.annual_income_growth_rate }}<span class="input-group-text">%</span></div>{{ review_form.annual_income_growth_rate.errors }}</div>
+              <div class="col-md-6"><label class="form-label" for="{{ review_form.annual_contribution_growth_rate.id_for_label }}">Possible yearly growth in monthly investing</label><div class="input-group">{{ review_form.annual_contribution_growth_rate }}<span class="input-group-text">%</span></div>{{ review_form.annual_contribution_growth_rate.errors }}</div>
+              <div class="col-12 form-check ms-2">{{ review_form.include_emergency_reserve_in_target }} <label class="form-check-label" for="{{ review_form.include_emergency_reserve_in_target.id_for_label }}">Count emergency savings toward this goal</label></div>
+            </div>
+            <div class="d-flex align-items-center gap-3 mt-3"><button class="btn btn-outline-primary" type="submit">Apply these assumptions</button><span class="small text-muted" data-preview-state aria-live="polite"></span></div>
+          </details>
+        </div>
+      </form>
+    </div>
+
+    <aside class="planner-summary card shadow-sm">
+      <div class="card-body p-4">
+        <div class="summary-label">Suggested monthly investment</div>
+        <div class="summary-value" data-preview-required>{% if draft.required_monthly_investment is not None %}{{ draft.required_monthly_investment|idr }}{% else %}Try another date{% endif %}</div>
+        <hr>
+        <div class="summary-label">Estimated target</div><div class="h5" data-preview-target>{{ draft.total_target|idr }}</div>
+        <div class="summary-label mt-3">At your current pace</div><div data-preview-date>{{ draft.projected_achievement_date|date:"F Y"|default:"Not reached in this estimate" }}</div>
+        <div class="summary-label mt-3">Progress today</div><div data-preview-progress>{{ draft.progress_percent }}%</div>
+        <div class="alert alert-warning small mt-3 mb-0 d-none" data-preview-error>We could not refresh the estimate. Your answers and last result are still here.</div>
+      </div>
+      <div class="card-footer bg-body p-3">
+        <form method="post" action="{% url 'freedom_plan_save' plan.id %}">{% csrf_token %}<button class="btn btn-success w-100" type="submit"><i class="bi bi-lock me-1"></i>Save this version</button></form>
+        <a class="btn btn-link w-100 mt-1" href="{% url 'freedom_plan_events' plan.id %}"><i class="bi bi-arrow-left me-1"></i>Back to life events</a>
+      </div>
+    </aside>
+  </div>
+  <p class="small text-muted border-top pt-3">This is an educational estimate, not personalized financial advice. Returns, inflation, and spending can change.</p>
+</div>
+{% endblock %}
+
+{% block extra_js %}<script src="{% static 'js/financial_planning_review.js' %}"></script>{% endblock %}

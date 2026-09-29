@@ -142,7 +142,7 @@ class FinancialPlanningViewTests(TestCase):
 
         response = self.client.post(reverse("freedom_scenario_duplicate", args=(saved.plan_id, saved.pk)))
         duplicate = FreedomScenario.objects.exclude(plan_id=saved.plan_id).get()
-        self.assertRedirects(response, reverse("freedom_plan_draft", args=(duplicate.plan_id,)))
+        self.assertRedirects(response, reverse("freedom_plan_review", args=(duplicate.plan_id,)))
 
         self.client.post(reverse("freedom_plan_rename", args=(saved.plan_id,)), {"name": "Renamed"})
         saved.plan.refresh_from_db()

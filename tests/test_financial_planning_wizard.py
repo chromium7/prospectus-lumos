@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 
 from django.contrib.auth.models import User
+from django.contrib.staticfiles import finders
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -56,6 +58,19 @@ def _event_payload(events: list[dict[str, object]], *, initial_forms: int = 0) -
     for index, event in enumerate(events):
         for field, value in event.items():
             values[f"events-{index}-{field}"] = value
+    return values
+
+
+def _review_payload(**overrides: object) -> dict[str, object]:
+    values: dict[str, object] = {
+        "withdrawal_rate": "4",
+        "annual_return_rate": "7",
+        "annual_inflation_rate": "3",
+        "annual_income_growth_rate": "0",
+        "annual_contribution_growth_rate": "0",
+        "safety_buffer_rate": "10",
+    }
+    values.update(overrides)
     return values
 
 
@@ -203,7 +218,7 @@ class FinancialPlanningWizardTests(TestCase):
             "notes": "",
         }
         response = self.client.post(url, _event_payload([car, home]))
-        self.assertRedirects(response, reverse("freedom_plan_draft", args=(draft.plan_id,)))
+        self.assertRedirects(response, reverse("freedom_plan_review", args=(draft.plan_id,)))
         draft.refresh_from_db()
         self.assertEqual(list(draft.events.values_list("name", flat=True)), ["Car", "Home deposit"])
         self.assertEqual(len(draft.projection_data["separate_savings"]), 1)
@@ -245,7 +260,118 @@ class FinancialPlanningWizardTests(TestCase):
         self.assertFalse(draft.events.exists())
 
         response = self.client.post(url, {"action": "skip_events"})
-        self.assertRedirects(response, reverse("freedom_plan_draft", args=(draft.plan_id,)))
+        self.assertRedirects(response, reverse("freedom_plan_review", args=(draft.plan_id,)))
+
+    def test_review_page_explains_results_updates_assumptions_and_saves(self) -> None:
+        self.client.post(reverse("freedom_plan_create"), _goal_payload())
+        draft = FreedomScenario.objects.get(plan__user=self.user)
+        review_url = reverse("freedom_plan_review", args=(draft.plan_id,))
+
+        response = self.client.get(review_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "financial_planning/wizard_review.html")
+        self.assertContains(response, "This is a direction, not a verdict")
+        self.assertContains(response, "You do not need to change them")
+        self.assertContains(response, "Suggested monthly investment")
+
+        response = self.client.post(review_url, _review_payload(annual_return_rate="6.5", safety_buffer_rate="15"))
+        self.assertRedirects(response, review_url)
+        draft.refresh_from_db()
+        self.assertEqual(draft.annual_return_rate, Decimal("6.5"))
+        self.assertEqual(draft.safety_buffer_rate, Decimal("15"))
+
+        response = self.client.post(reverse("freedom_plan_save", args=(draft.plan_id,)))
+        self.assertEqual(response.status_code, 302)
+        draft.refresh_from_db()
+        self.assertEqual(draft.status, FreedomScenario.Status.SAVED)
+        self.assertEqual(draft.version, 1)
+        saved_target = draft.total_target
+
+        source = DocumentSource.objects.create(
+            user=self.user,
+            source_type=DocumentSource.SourceType.DIRECT_UPLOAD,
+            name="Later changes",
+        )
+        Document.objects.create(
+            user=self.user,
+            source=source,
+            month=7,
+            year=2026,
+            total_income=999999999,
+            total_expenses=1,
+        )
+        draft.refresh_from_db()
+        self.assertEqual(draft.total_target, saved_target)
+
+    def test_review_preview_is_owned_server_authoritative_and_rejects_stale_results_in_js(self) -> None:
+        self.client.post(reverse("freedom_plan_create"), _goal_payload())
+        draft = FreedomScenario.objects.get(plan__user=self.user)
+        preview_url = reverse("freedom_calculate_preview")
+        response = self.client.post(
+            preview_url,
+            {
+                **_review_payload(),
+                "plan_id": draft.plan_id,
+                "preview_request_id": "latest-8",
+                "total_target": "1",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["request_id"], "latest-8")
+        self.assertEqual(data["schema_version"], 1)
+        self.assertIsInstance(data["summary"]["total_target"], str)
+        self.assertGreater(Decimal(data["summary"]["total_target"]), Decimal("1"))
+        self.assertIn("timeline", data)
+        self.assertIn("separate_savings", data)
+
+        self.client.login(username="other-wizard", password="pass")
+        forbidden = self.client.post(preview_url, {**_review_payload(), "plan_id": draft.plan_id})
+        self.assertEqual(forbidden.status_code, 404)
+
+        script_path = finders.find("js/financial_planning_review.js")
+        self.assertIsNotNone(script_path)
+        with open(script_path, encoding="utf-8") as script_file:
+            script = script_file.read()
+        self.assertIn("new AbortController()", script)
+        self.assertIn("sequence !== previewSequence", script)
+        self.assertIn("result.request_id !== String(sequence)", script)
+
+    def test_new_wizard_routes_require_authentication_and_cap_events(self) -> None:
+        self.client.post(reverse("freedom_plan_create"), _goal_payload())
+        draft = FreedomScenario.objects.get(plan__user=self.user)
+        self.client.logout()
+        for url in (
+            reverse("freedom_plan_goal", args=(draft.plan_id,)),
+            reverse("freedom_plan_money", args=(draft.plan_id,)),
+            reverse("freedom_plan_events", args=(draft.plan_id,)),
+            reverse("freedom_plan_review", args=(draft.plan_id,)),
+            reverse("freedom_calculate_preview"),
+        ):
+            self.assertEqual(self.client.get(url).status_code, 302)
+
+        self.client.login(username="wizard", password="pass")
+        events: list[dict[str, object]] = [
+            {
+                "name": f"Plan {index}",
+                "category": "custom",
+                "event_date": "2030-01-01",
+                "one_time_amount": "1",
+                "amount_basis": "event_date",
+                "recurring_monthly_amount": "0",
+                "recurring_end_date": "",
+                "funding_source": "investment_portfolio",
+                "sort_order": str(index),
+                "notes": "",
+            }
+            for index in range(51)
+        ]
+        response = self.client.post(
+            reverse("freedom_plan_events", args=(draft.plan_id,)),
+            _event_payload(events),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "at most 50", html=False)
 
     def test_portfolio_analyzer_links_its_owned_period_into_the_wizard(self) -> None:
         response = self.client.get(reverse("portfolio_analyzer") + "?year_from=2025&year_to=2026")
