@@ -32,7 +32,7 @@ from .forms import (
     ReviewStepForm,
     event_formset_values,
 )
-from .results import scenario_result_context
+from .results import scenario_result_context, timeline_chart_payload, timeline_summary
 
 WIZARD_STEPS = ((1, "Your goal"), (2, "Your money"), (3, "Life events"), (4, "Review"))
 
@@ -485,6 +485,9 @@ def scenario_detail_view(request: TypedHttpRequest, plan_id: int, scenario_id: i
         "selected_tab": "financial_freedom",
     }
     context.update(scenario_result_context(scenario))
+    chart_data = timeline_chart_payload(scenario)
+    context["chart_data"] = chart_data
+    context["chart_summary"] = timeline_summary(scenario, chart_data)
     return render(request, "financial_planning/scenario_detail.html", context)
 
 

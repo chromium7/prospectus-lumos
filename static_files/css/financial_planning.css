@@ -157,3 +157,14 @@ details.card > summary {
   top: 0;
   background: var(--bs-body-bg);
 }
+
+.result-chart {
+  position: relative;
+  height: 20rem;
+}
+
+@media (max-width: 575.98px) {
+  .result-chart {
+    height: 15rem;
+  }
+}
