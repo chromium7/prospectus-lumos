@@ -34,7 +34,7 @@ from .forms import (
     event_formset_values,
 )
 from .comparison import compare_scenarios
-from .results import scenario_result_context, timeline_chart_payload, timeline_summary
+from .results import STATUS_COPY, scenario_result_context, timeline_chart_payload, timeline_summary
 
 WIZARD_STEPS = ((1, "Your goal"), (2, "Your money"), (3, "Life events"), (4, "Review"))
 
@@ -128,6 +128,14 @@ def _review_context(
     }
 
 
+def _progress_width(scenario: FreedomScenario | None) -> int:
+    """Clamp stored progress to a 0-100 bar width without changing the reported percentage."""
+
+    if scenario is None:
+        return 0
+    return max(0, min(100, int(scenario.progress_percent)))
+
+
 def _owned_plan(request: TypedHttpRequest, plan_id: int) -> FreedomPlan:
     return get_object_or_404(FreedomPlan, pk=plan_id, user=request.user)
 
@@ -163,7 +171,7 @@ def plan_list_view(request: TypedHttpRequest) -> HttpResponse:
     """List the current user's active or archived plans with prefetched scenarios."""
 
     show_archived = request.GET.get("archived") == "1"
-    scenarios = FreedomScenario.objects.order_by("-version", "-created_at")
+    scenarios = FreedomScenario.objects.order_by("-version", "-created_at").prefetch_related("events")
     plans = list(
         FreedomPlan.objects.filter(user=request.user, is_archived=show_archived).prefetch_related(
             Prefetch("scenarios", queryset=scenarios, to_attr="library_scenarios")
@@ -178,14 +186,13 @@ def plan_list_view(request: TypedHttpRequest) -> HttpResponse:
                 None,
             ),
         )
-        setattr(
-            plan,
-            "library_latest",
-            next(
-                (scenario for scenario in plan.library_scenarios if scenario.status == FreedomScenario.Status.SAVED),
-                None,
-            ),
-        )
+        saved = [scenario for scenario in plan.library_scenarios if scenario.status == FreedomScenario.Status.SAVED]
+        latest = saved[0] if saved else None
+        setattr(plan, "library_latest", latest)
+        setattr(plan, "library_saved_count", len(saved))
+        setattr(plan, "library_status", STATUS_COPY.get(latest.result_status) if latest else None)
+        setattr(plan, "library_event_count", latest.events.count() if latest else 0)
+        setattr(plan, "library_progress", _progress_width(latest))
     return render(
         request,
         "financial_planning/plan_list.html",
