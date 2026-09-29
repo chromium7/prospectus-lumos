@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% load static formatting %}
+
+{% block title %}Your money - Prospectus Lumos{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/financial_planning.css' %}">{% endblock %}
+
+{% block content %}
+<div class="wizard-shell">
+  <a class="small text-decoration-none" href="{% url 'freedom_plan_list' %}"><i class="bi bi-arrow-left"></i> Save and leave</a>
+  <div class="mt-3">{% include "financial_planning/partials/wizard_steps.html" with wizard_steps=wizard_steps %}</div>
+
+  <header class="mb-4">
+    <p class="text-primary fw-semibold mb-2">Step 2 of 4 · Your money today</p>
+    <h1 class="h2 mb-2">What does a normal month look like?</h1>
+    <p class="text-muted mb-0">Estimates are fine. Use take-home amounts—the money that actually reaches or leaves your accounts.</p>
+  </header>
+
+  <form method="post" class="card shadow-sm" novalidate>
+    {% csrf_token %}
+    {{ money_form.source_mode }}{{ money_form.source_period_start }}{{ money_form.source_period_end }}{{ money_form.source_month_count }}
+    {{ money_form.source_excluded_income_categories }}{{ money_form.source_excluded_expense_categories }}
+    <div class="card-body p-4">
+      {% if money_form.errors or actuals_form.errors %}
+        <div class="alert alert-danger" role="alert"><strong>Please check the highlighted answers.</strong>{{ money_form.non_field_errors }}{{ actuals_form.non_field_errors }}</div>
+      {% endif %}
+
+      <section class="rounded border bg-body-tertiary p-3 mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+          <div>
+            <h2 class="h5 mb-1">Want us to fill this in?</h2>
+            <p class="text-muted small mb-0">We can estimate a normal month from your tracked finances. You can still edit every number.</p>
+          </div>
+          <button class="btn btn-outline-primary" type="submit" name="action" value="load_actuals">Use my tracked data</button>
+        </div>
+        <details class="mt-3">
+          <summary class="small fw-semibold">Choose the history or leave things out</summary>
+          <div class="row g-3 mt-1">
+            <div class="col-md-6"><label class="form-label" for="{{ actuals_form.period.id_for_label }}">{{ actuals_form.period.label }}</label>{{ actuals_form.period }}{{ actuals_form.period.errors }}</div>
+            <div class="col-md-3"><label class="form-label" for="{{ actuals_form.start_year.id_for_label }}">From year</label>{{ actuals_form.start_year }}{{ actuals_form.start_year.errors }}</div>
+            <div class="col-md-3"><label class="form-label" for="{{ actuals_form.end_year.id_for_label }}">To year</label>{{ actuals_form.end_year }}{{ actuals_form.end_year.errors }}</div>
+            {% if actuals_form.excluded_income_categories.field.choices %}<div class="col-md-6"><span class="form-label d-block">Ignore unusual income</span>{{ actuals_form.excluded_income_categories }}{{ actuals_form.excluded_income_categories.errors }}</div>{% endif %}
+            {% if actuals_form.excluded_expense_categories.field.choices %}<div class="col-md-6"><span class="form-label d-block">Ignore unusual spending</span>{{ actuals_form.excluded_expense_categories }}{{ actuals_form.excluded_expense_categories.errors }}</div>{% endif %}
+          </div>
+        </details>
+      </section>
+
+      {% if actuals_snapshot %}
+        <div class="alert alert-info">
+          <strong>Estimate loaded from {{ actuals_snapshot.month_count }} represented complete month{{ actuals_snapshot.month_count|pluralize }}.</strong>
+          {% if actuals_snapshot.period_start and actuals_snapshot.period_end %}<div class="small">Source period: {{ actuals_snapshot.period_start|date:"M Y" }} to {{ actuals_snapshot.period_end|date:"M Y" }}.</div>{% endif %}
+          {% for warning in actuals_snapshot.warnings %}<div class="small">{{ warning }}</div>{% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="row g-4">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold" for="{{ money_form.current_monthly_income.id_for_label }}">How much comes in each month?</label>
+          <div class="input-group"><span class="input-group-text">Rp</span>{{ money_form.current_monthly_income }}</div>{{ money_form.current_monthly_income.errors }}
+          <div class="form-text">Salary and other regular income after tax.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold" for="{{ money_form.current_monthly_expenses.id_for_label }}">How much do you usually spend?</label>
+          <div class="input-group"><span class="input-group-text">Rp</span>{{ money_form.current_monthly_expenses }}</div>{{ money_form.current_monthly_expenses.errors }}
+          <div class="form-text">Include bills, debt payments, and everyday spending.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold" for="{{ money_form.current_monthly_investment.id_for_label }}">How much do you invest each month?</label>
+          <div class="input-group"><span class="input-group-text">Rp</span>{{ money_form.current_monthly_investment }}</div>{{ money_form.current_monthly_investment.errors }}
+          <div class="form-text">Include regular deposits intended for your long-term future.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold" for="{{ money_form.current_investable_assets.id_for_label }}">How much is already invested?</label>
+          <div class="input-group"><span class="input-group-text">Rp</span>{{ money_form.current_investable_assets }}</div>{{ money_form.current_investable_assets.errors }}
+          <div class="form-text">Investments you are willing to use for this goal.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold" for="{{ money_form.emergency_savings.id_for_label }}">How much is set aside for emergencies?</label>
+          <div class="input-group"><span class="input-group-text">Rp</span>{{ money_form.emergency_savings }}</div>{{ money_form.emergency_savings.errors }}
+          <div class="form-text">We keep this separate from your investments by default.</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-footer bg-body d-flex justify-content-between p-3">
+      <a class="btn btn-outline-secondary" href="{% url 'freedom_plan_goal' plan.id %}"><i class="bi bi-arrow-left me-1"></i> Back</a>
+      <button class="btn btn-primary" type="submit">Continue to life events <i class="bi bi-arrow-right ms-1"></i></button>
+    </div>
+  </form>
+</div>
+{% endblock %}

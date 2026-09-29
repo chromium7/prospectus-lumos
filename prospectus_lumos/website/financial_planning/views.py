@@ -1,22 +1,54 @@
 from __future__ import annotations
 
+from urllib.parse import urlencode
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Prefetch
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from prospectus_lumos.apps.financial_planning.models import FreedomPlan, FreedomScenario
 from prospectus_lumos.apps.financial_planning.services import (
+    ActualsSnapshot,
+    ActualsSnapshotService,
     DraftAlreadyExistsError,
     FreedomScenarioService,
 )
 from prospectus_lumos.core.utils import TypedHttpRequest
 
-from .forms import FreedomPlanForm, FreedomScenarioForm, GoalStepForm
+from .forms import ActualsSnapshotForm, FreedomPlanForm, FreedomScenarioForm, GoalStepForm, MoneyStepForm
 
 WIZARD_STEPS = ((1, "Your goal"), (2, "Your money"), (3, "Life events"), (4, "Review"))
+
+
+def _tracked_source_query(request: TypedHttpRequest) -> str:
+    if request.GET.get("source") != FreedomScenario.SourceMode.TRACKED_ACTUALS:
+        return ""
+    values = {"source": FreedomScenario.SourceMode.TRACKED_ACTUALS, "period": request.GET.get("period", "12m")}
+    if values["period"] == "custom":
+        values.update({"start_year": request.GET.get("start_year", ""), "end_year": request.GET.get("end_year", "")})
+    return urlencode(values)
+
+
+def _snapshot_from_form(request: TypedHttpRequest, form: ActualsSnapshotForm) -> ActualsSnapshot | None:
+    if not form.is_valid():
+        return None
+    return ActualsSnapshotService(user=request.user).create_snapshot(**form.snapshot_options())
+
+
+def _actuals_form_from_query(request: TypedHttpRequest) -> tuple[ActualsSnapshotForm, ActualsSnapshot | None]:
+    if request.GET.get("source") != FreedomScenario.SourceMode.TRACKED_ACTUALS:
+        return ActualsSnapshotForm(user=request.user), None
+    query_data = {
+        "period": request.GET.get("period", "12m"),
+        "start_year": request.GET.get("start_year", ""),
+        "end_year": request.GET.get("end_year", ""),
+    }
+    form = ActualsSnapshotForm(query_data, user=request.user)
+    return form, _snapshot_from_form(request, form)
 
 
 def _owned_plan(request: TypedHttpRequest, plan_id: int) -> FreedomPlan:
@@ -99,7 +131,9 @@ def plan_create_view(request: TypedHttpRequest) -> HttpResponse:
             scenario_data={**initial, **goal_form.scenario_values()},
         )
         messages.success(request, "Great start. Next, tell us what your money looks like today.")
-        return redirect("freedom_plan_draft", plan_id=draft.plan_id)
+        money_url = reverse("freedom_plan_money", args=(draft.plan_id,))
+        source_query = _tracked_source_query(request)
+        return redirect(f"{money_url}?{source_query}" if source_query else money_url)
     return render(
         request,
         "financial_planning/wizard_goal.html",
@@ -133,7 +167,7 @@ def plan_goal_view(request: TypedHttpRequest, plan_id: int) -> HttpResponse:
             scenario_data=goal_form.scenario_values(),
         )
         messages.success(request, "Your goal is updated.")
-        return redirect("freedom_plan_draft", plan_id=plan.pk)
+        return redirect("freedom_plan_money", plan_id=plan.pk)
     return render(
         request,
         "financial_planning/wizard_goal.html",
@@ -142,6 +176,50 @@ def plan_goal_view(request: TypedHttpRequest, plan_id: int) -> HttpResponse:
             "plan_form": plan_form,
             "goal_form": goal_form,
             "current_step": 1,
+            "wizard_steps": WIZARD_STEPS,
+            "selected_tab": "financial_freedom",
+        },
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def plan_money_view(request: TypedHttpRequest, plan_id: int) -> HttpResponse:
+    """Guide an owner through current finances and optional tracked-data import."""
+
+    plan = _owned_plan(request, plan_id)
+    draft = get_object_or_404(FreedomScenario, plan=plan, status=FreedomScenario.Status.DRAFT)
+    money_form = MoneyStepForm(request.POST or None, instance=draft)
+    actuals_form, actuals_snapshot = _actuals_form_from_query(request)
+    if request.method == "POST" and request.POST.get("action") == "load_actuals":
+        actuals_form = ActualsSnapshotForm(request.POST, user=request.user)
+        actuals_snapshot = _snapshot_from_form(request, actuals_form)
+        if actuals_snapshot:
+            base_values = money_form.scenario_values() if money_form.is_valid() else {}
+            money_form = MoneyStepForm(
+                instance=draft,
+                initial={**base_values, **actuals_snapshot.scenario_values()},
+            )
+    elif request.method == "GET" and actuals_snapshot:
+        money_form = MoneyStepForm(instance=draft, initial=actuals_snapshot.scenario_values())
+    elif request.method == "POST" and money_form.is_valid():
+        FreedomScenarioService().update_draft(
+            user=request.user,
+            draft=draft,
+            scenario_data=money_form.scenario_values(),
+        )
+        messages.success(request, "Your current money picture is saved.")
+        return redirect("freedom_plan_draft", plan_id=plan.pk)
+    return render(
+        request,
+        "financial_planning/wizard_money.html",
+        {
+            "plan": plan,
+            "draft": draft,
+            "money_form": money_form,
+            "actuals_form": actuals_form,
+            "actuals_snapshot": actuals_snapshot,
+            "current_step": 2,
             "wizard_steps": WIZARD_STEPS,
             "selected_tab": "financial_freedom",
         },
