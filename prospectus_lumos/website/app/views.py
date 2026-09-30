@@ -12,8 +12,6 @@ def app_home_view(request: TypedHttpRequest) -> HttpResponse:
         request,
         "app/home.html",
         {
-            "active_navigation": "home",
-            "app_page_eyebrow": "Your money",
-            "app_page_title": "Budgeting home",
+            "selected_tab": "app_home",
         },
     )
