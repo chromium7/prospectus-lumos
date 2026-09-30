@@ -1,0 +1,9 @@
+<section class="app-state app-state--{{ state|default:'empty' }}"{% if state_id %} aria-labelledby="{{ state_id }}"{% endif %}{% if state == 'loading' %} aria-busy="true"{% endif %}{% if state == 'error' %} role="alert"{% else %} role="status"{% endif %}>
+  {% if state == 'loading' %}<span class="app-spinner" aria-hidden="true"></span>{% endif %}
+  {% if icon %}<div class="app-state__icon" aria-hidden="true">{{ icon }}</div>{% endif %}
+  <div>
+    <h2{% if state_id %} id="{{ state_id }}"{% endif %}>{{ title }}</h2>
+    {% if message %}<p>{{ message }}</p>{% endif %}
+    {% if action_url and action_label %}<a class="app-button app-button--primary" href="{{ action_url }}">{{ action_label }}</a>{% endif %}
+  </div>
+</section>

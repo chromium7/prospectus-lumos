@@ -1,0 +1,28 @@
+{% extends "app/base.html" %}
+
+{% block title %}Budgeting home - Prospectus Lumos{% endblock %}
+
+{% block content %}
+  <section class="app-state app-state--empty" aria-labelledby="app-foundation-title">
+    <div class="app-state__icon" aria-hidden="true">
+      <svg class="app-icon"><use href="#icon-plan"></use></svg>
+    </div>
+    <div>
+      <h2 id="app-foundation-title">A calmer way to manage your money</h2>
+      <p>Your budgeting space is ready. Accounts, activity, and monthly plans will appear here as they are added.</p>
+      <div class="app-actions">
+        <a class="app-button app-button--primary" href="{% url 'document_list' %}">Open your documents</a>
+        <a class="app-button app-button--secondary" href="{% url 'freedom_plan_list' %}">View Financial Freedom plans</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="app-card app-card--compact" aria-labelledby="existing-tools-title">
+    <div>
+      <p class="app-eyebrow">Already in Lumos</p>
+      <h2 id="existing-tools-title">Your existing tools are still here</h2>
+      <p class="app-muted">Review imported history or explore income, spending, and portfolio trends while the budgeting pages are filled in.</p>
+    </div>
+    <a class="app-button app-button--secondary" href="{% url 'portfolio_analyzer' %}">Open analyzers</a>
+  </section>
+{% endblock %}
