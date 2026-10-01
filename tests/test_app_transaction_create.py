@@ -53,11 +53,13 @@ class TransactionCreatePageTests(TestCase):
         self.assertEqual(Category.objects.filter(user=self.user).count(), 16)
         self.assertContains(response, "Expense")
         self.assertContains(response, "Income")
-        self.assertContains(response, "Transfer")
-        self.assertContains(response, 'name="type"', count=3)
+        self.assertNotContains(response, ">Transfer<")
+        self.assertContains(response, 'type="radio" name="type"', count=2)
         self.assertContains(response, "autofocus")
         self.assertContains(response, "Save and add another")
         self.assertContains(response, "reconnect before trying again")
+        self.assertNotContains(response, "transaction-form.js")
+        self.assertContains(response, 'data-choice-filter-group="transaction-category"')
 
     def test_get_renders_recent_account_and_category_shortcuts_as_optional_enhancements(self) -> None:
         account = self._account()
@@ -77,7 +79,8 @@ class TransactionCreatePageTests(TestCase):
         self.assertContains(response, 'aria-label="Recently used accounts"')
         self.assertContains(response, f'data-select-value="{account.pk}"')
         self.assertContains(response, 'aria-label="Recently used categories"')
-        self.assertContains(response, 'data-shortcut-category-type="expense"')
+        self.assertContains(response, 'data-choice-group="transaction-category"')
+        self.assertContains(response, 'data-choice-value="expense"')
 
     def test_invalid_post_preserves_values_and_shows_summary_and_field_errors(self) -> None:
         account = self._account()
@@ -92,7 +95,6 @@ class TransactionCreatePageTests(TestCase):
                 "amount": "125000.50",
                 "account": account.pk,
                 "category": "",
-                "transfer_account": "",
                 "occurred_on": "2026-09-30",
                 "payee": "Market",
                 "note": "Weekly groceries",
@@ -118,7 +120,6 @@ class TransactionCreatePageTests(TestCase):
             "amount": "125000",
             "account": account.pk,
             "category": category.pk,
-            "transfer_account": "",
             "occurred_on": "2026-09-30",
             "payee": "Market",
             "note": "Weekly groceries",
@@ -145,67 +146,62 @@ class TransactionCreatePageTests(TestCase):
         self.client.force_login(self.user)
         _, token = self._open_form()
         expense_category = Category.objects.get(user=self.user, name="Groceries", type=Category.Type.EXPENSE)
+        income_category = Category.objects.get(user=self.user, name="Salary", type=Category.Type.INCOME)
 
-        response = self.client.post(
+        isolated = self.client.post(
             self.url,
             {
                 "submission_token": token,
                 "type": LedgerTransaction.Type.INCOME,
                 "amount": "200000",
                 "account": other_account.pk,
+                "category": income_category.pk,
+                "occurred_on": "2026-09-30",
+                "save_action": "save",
+            },
+        )
+
+        self.assertEqual(isolated.status_code, 400)
+        self.assertContains(isolated, "Select a valid choice", status_code=400)
+        self.assertEqual(isolated.context["form"].fields["account"].queryset.get(), account)
+
+        wrong_category = self.client.post(
+            self.url,
+            {
+                "submission_token": token,
+                "type": LedgerTransaction.Type.INCOME,
+                "amount": "200000",
+                "account": account.pk,
                 "category": expense_category.pk,
                 "occurred_on": "2026-09-30",
                 "save_action": "save",
             },
         )
 
-        self.assertEqual(response.status_code, 400)
-        self.assertContains(response, "Select a valid choice", status_code=400)
-        self.assertContains(response, "Choose an income category.", status_code=400)
+        self.assertEqual(wrong_category.status_code, 400)
+        self.assertContains(wrong_category, "Choose an income category.", status_code=400)
         self.assertFalse(LedgerTransaction.objects.exists())
-        self.assertEqual(response.context["form"].fields["account"].queryset.get(), account)
 
-    def test_transfer_requires_different_destination_and_save_another_uses_prg(self) -> None:
-        source = self._account(name="Wallet")
-        destination = self._account(name="Bank")
+    def test_transfer_type_is_not_accepted_by_the_page(self) -> None:
+        account = self._account()
         self.client.force_login(self.user)
         _, token = self._open_form()
 
-        invalid = self.client.post(
+        response = self.client.post(
             self.url,
             {
                 "submission_token": token,
                 "type": LedgerTransaction.Type.TRANSFER,
                 "amount": "100000",
-                "account": source.pk,
-                "transfer_account": source.pk,
-                "category": "",
+                "account": account.pk,
                 "occurred_on": "2026-10-01",
-                "save_action": "save_another",
+                "save_action": "save",
             },
         )
 
-        self.assertEqual(invalid.status_code, 400)
-        self.assertContains(invalid, "Choose a different destination account.", status_code=400)
-
-        valid = self.client.post(
-            self.url,
-            {
-                "submission_token": token,
-                "type": LedgerTransaction.Type.TRANSFER,
-                "amount": "100000",
-                "account": source.pk,
-                "transfer_account": destination.pk,
-                "category": "",
-                "occurred_on": "2026-10-01",
-                "save_action": "save_another",
-            },
-        )
-
-        self.assertRedirects(valid, self.url, fetch_redirect_response=False)
-        transaction = LedgerTransaction.objects.get()
-        self.assertEqual(transaction.transfer_account, destination)
-        self.assertIsNone(transaction.category)
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "Select a valid choice", status_code=400)
+        self.assertFalse(LedgerTransaction.objects.exists())
 
     def test_unsafe_return_url_falls_back_to_dashboard(self) -> None:
         account = self._account()

@@ -16,12 +16,17 @@ class CategorySelect(forms.Select):
         option = super().create_option(*args, **kwargs)
         value = option.get("value")
         if value and getattr(value, "instance", None):
-            option["attrs"]["data-category-type"] = value.instance.type
+            option["attrs"].update(
+                {
+                    "data-choice-group": "transaction-category",
+                    "data-choice-value": value.instance.type,
+                }
+            )
         return option
 
 
 class TransactionForm(forms.ModelForm):
-    """Validate one user-owned income, expense, or transfer entry."""
+    """Validate one user-owned income or expense entry."""
 
     submission_token = forms.CharField(widget=forms.HiddenInput())
 
@@ -32,7 +37,6 @@ class TransactionForm(forms.ModelForm):
             "amount",
             "account",
             "category",
-            "transfer_account",
             "occurred_on",
             "payee",
             "note",
@@ -51,14 +55,12 @@ class TransactionForm(forms.ModelForm):
             ),
             "account": forms.Select(attrs={"class": "form-select"}),
             "category": CategorySelect(attrs={"class": "form-select"}),
-            "transfer_account": forms.Select(attrs={"class": "form-select"}),
             "occurred_on": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
             "payee": forms.TextInput(attrs={"class": "form-control", "placeholder": "Who was this with?"}),
             "note": forms.Textarea(attrs={"class": "form-control", "placeholder": "Add a note", "rows": 3}),
         }
         labels = {
             "account": "Account",
-            "transfer_account": "To account",
             "occurred_on": "Date",
         }
 
@@ -69,50 +71,29 @@ class TransactionForm(forms.ModelForm):
         type_field.choices = (
             (LedgerTransaction.Type.EXPENSE, "Expense"),
             (LedgerTransaction.Type.INCOME, "Income"),
-            (LedgerTransaction.Type.TRANSFER, "Transfer"),
         )
         type_field.initial = self.initial.get("type", LedgerTransaction.Type.EXPENSE)
         self.fields["occurred_on"].initial = self.initial.get("occurred_on", timezone.localdate())
         account_field = cast(forms.ModelChoiceField, self.fields["account"])
         category_field = cast(forms.ModelChoiceField, self.fields["category"])
-        transfer_account_field = cast(forms.ModelChoiceField, self.fields["transfer_account"])
         account_field.queryset = FinancialAccount.objects.for_user(user).active()
         category_field.queryset = Category.objects.for_user(user).active()
-        transfer_account_field.queryset = FinancialAccount.objects.for_user(user).active()
-        category_field.required = False
-        transfer_account_field.required = False
+        category_field.required = True
         category_field.empty_label = "Choose a category"
-        transfer_account_field.empty_label = "Choose a destination"
+        category_field.error_messages["required"] = "Choose a category."
 
     def clean(self) -> dict[str, Any]:
         cleaned_data = super().clean()
         transaction_type = cleaned_data.get("type")
         category = cleaned_data.get("category")
-        account = cleaned_data.get("account")
-        transfer_account = cleaned_data.get("transfer_account")
-
-        if transaction_type == LedgerTransaction.Type.TRANSFER:
-            cleaned_data["category"] = None
-            if transfer_account is None:
-                self.add_error(
-                    "transfer_account",
-                    forms.ValidationError("Choose the account receiving this transfer.", code="required"),
-                )
-            elif account == transfer_account:
-                self.add_error(
-                    "transfer_account",
-                    forms.ValidationError("Choose a different destination account.", code="same_account"),
-                )
-        elif transaction_type in (LedgerTransaction.Type.EXPENSE, LedgerTransaction.Type.INCOME):
-            cleaned_data["transfer_account"] = None
-            if category is None:
-                self.add_error("category", forms.ValidationError("Choose a category.", code="required"))
-            elif category.type != transaction_type:
-                label = "expense" if transaction_type == LedgerTransaction.Type.EXPENSE else "income"
-                self.add_error(
-                    "category",
-                    forms.ValidationError(f"Choose an {label} category.", code="category_type"),
-                )
+        if self.errors:
+            return cleaned_data
+        if category.type != transaction_type:
+            label = "expense" if transaction_type == LedgerTransaction.Type.EXPENSE else "income"
+            self.add_error(
+                "category",
+                forms.ValidationError(f"Choose an {label} category.", code="category_type"),
+            )
         return cleaned_data
 
     def save(self, commit: bool = True) -> LedgerTransaction:

@@ -37,13 +37,13 @@
             </div>
             {% endif %}
 
-            <fieldset class="transaction-type">
+            <fieldset class="transaction-type" data-choice-filter-name="type" data-choice-filter-group="transaction-category">
                 <legend>Type</legend>
                 <div class="transaction-type__options">
                     {% for radio in form.type %}
                     <label class="transaction-type__option" for="{{ radio.id_for_label }}">
                         {{ radio.tag }}
-                        <span>{% if radio.choice_label == "Expense" %}<i class="bi bi-arrow-up-right" aria-hidden="true"></i>{% elif radio.choice_label == "Income" %}<i class="bi bi-arrow-down-left" aria-hidden="true"></i>{% else %}<i class="bi bi-arrow-left-right" aria-hidden="true"></i>{% endif %}{{ radio.choice_label }}</span>
+                        <span>{% if radio.choice_label == "Expense" %}<i class="bi bi-arrow-up-right" aria-hidden="true"></i>{% else %}<i class="bi bi-arrow-down-left" aria-hidden="true"></i>{% endif %}{{ radio.choice_label }}</span>
                     </label>
                     {% endfor %}
                 </div>
@@ -60,8 +60,8 @@
             </div>
 
             <div class="transaction-form__grid">
-                <div class="transaction-field" data-standard-account>
-                    <label for="{{ form.account.id_for_label }}"><span data-account-label>Account</span> <span aria-hidden="true">*</span></label>
+                <div class="transaction-field">
+                    <label for="{{ form.account.id_for_label }}">Account <span aria-hidden="true">*</span></label>
                     {{ form.account }}
                     {% if recent_accounts %}
                     <div class="transaction-shortcuts" aria-label="Recently used accounts">
@@ -72,19 +72,14 @@
                 </div>
                 <div class="transaction-field" data-category-field>
                     <label for="{{ form.category.id_for_label }}">Category <span aria-hidden="true">*</span></label>
-                    {{ form.category }}
+                    <span data-filtered-choice-group="transaction-category">{{ form.category }}</span>
                     <p class="form-text">Choose a category that matches the selected type.</p>
                     {% if recent_categories %}
                     <div class="transaction-shortcuts" aria-label="Recently used categories">
-                        {% for category in recent_categories %}<button type="button" data-select-target="{{ form.category.id_for_label }}" data-select-value="{{ category.pk }}" data-shortcut-category-type="{{ category.type }}">{{ category.name }}</button>{% endfor %}
+                        {% for category in recent_categories %}<button type="button" data-select-target="{{ form.category.id_for_label }}" data-select-value="{{ category.pk }}" data-choice-group="transaction-category" data-choice-value="{{ category.type }}">{{ category.name }}</button>{% endfor %}
                     </div>
                     {% endif %}
                     {% for error in form.category.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
-                </div>
-                <div class="transaction-field" data-transfer-field>
-                    <label for="{{ form.transfer_account.id_for_label }}">To account <span aria-hidden="true">*</span></label>
-                    {{ form.transfer_account }}
-                    {% for error in form.transfer_account.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
                 </div>
                 <div class="transaction-field">
                     <label for="{{ form.occurred_on.id_for_label }}">Date <span aria-hidden="true">*</span></label>
@@ -121,8 +116,4 @@
     </form>
     {% endif %}
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<script src="{% load static %}{% static 'js/transaction-form.js' %}"></script>
 {% endblock %}

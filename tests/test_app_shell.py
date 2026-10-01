@@ -97,3 +97,10 @@ class AppShellTests(TestCase):
         self.assertIn("@media (max-width: 22.5rem)", stylesheet)
         self.assertIn("env(safe-area-inset-bottom)", stylesheet)
         self.assertIn("@media (prefers-reduced-motion: reduce)", stylesheet)
+
+    def test_shell_exposes_reusable_progressive_enhancement_helpers(self) -> None:
+        script = Path("static_files/js/app-shell.js").read_text(encoding="utf-8")
+
+        self.assertIn("window.AppShell", script)
+        self.assertIn("initializeChoiceFilters", script)
+        self.assertIn("initializeSelectShortcuts", script)
