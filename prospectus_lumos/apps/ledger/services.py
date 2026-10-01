@@ -192,7 +192,7 @@ def category_actuals_by_month(
     months = months_between(start, end)
     trends: dict[int, dict[date, Decimal]] = {}
     for category_id, month, total in rows:
-        trends.setdefault(category_id, {key: ZERO for key in months})[month] = total
+        trends.setdefault(category_id, dict.fromkeys(months, ZERO))[month] = total
     return trends
 
 
