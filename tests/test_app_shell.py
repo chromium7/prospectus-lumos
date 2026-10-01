@@ -47,7 +47,7 @@ class AppShellTests(TestCase):
         self.assertContains(response, 'name="month" type="month" value="2026-09"')
         self.assertContains(response, "Start with an account")
         self.assertNotContains(response, "dashboard.js")
-        self.assertContains(response, 'href="/app/transactions/new"')
+        self.assertContains(response, 'href="/app/transactions/new?next=/app/%3Fmonth%3D2026-09"')
 
     def test_dashboard_values_are_rendered_from_template_context(self) -> None:
         content = render_to_string(

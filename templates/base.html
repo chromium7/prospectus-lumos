@@ -154,7 +154,7 @@
         <a class="mobile-app-nav__link {% if selected_tab == 'app_activity' %}active{% endif %}" href="/app/transactions"{% if selected_tab == 'app_activity' %} aria-current="page"{% endif %}>
             <i class="bi bi-list-ul" aria-hidden="true"></i><span>Activity</span>
         </a>
-        <a class="mobile-app-nav__add" href="/app/transactions/new" aria-label="Add transaction">
+        <a class="mobile-app-nav__add" href="{% url 'app:transaction_create' %}?next={{ request.get_full_path|urlencode }}" aria-label="Add transaction">
             <i class="bi bi-plus-lg" aria-hidden="true"></i><span>Add</span>
         </a>
         <a class="mobile-app-nav__link {% if selected_tab == 'app_plan' %}active{% endif %}" href="/app/budgets/current"{% if selected_tab == 'app_plan' %} aria-current="page"{% endif %}>

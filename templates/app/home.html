@@ -13,7 +13,7 @@
         <p class="text-muted mb-0">See what came in, what went out, and what is left.</p>
     </div>
     <div class="dashboard__controls">
-        <a class="btn btn-primary dashboard__add" href="/app/transactions/new">
+        <a class="btn btn-primary dashboard__add" href="{% url 'app:transaction_create' %}?next={{ request.get_full_path|urlencode }}">
             <i class="bi bi-plus-lg" aria-hidden="true"></i> Add transaction
         </a>
         <form class="dashboard__month" method="get" aria-label="Choose dashboard month">
