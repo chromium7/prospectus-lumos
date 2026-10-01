@@ -32,11 +32,13 @@ class AppShellTests(TestCase):
         self.assertContains(response, f'href="{reverse("freedom_plan_list")}"')
         self.assertContains(response, "data-offline-banner")
         self.assertContains(response, "data-app-live-region")
+        self.assertContains(response, 'class="dropdown-menu dropdown-menu-end profile-menu"')
 
     def test_shell_styles_cover_dark_narrow_focus_and_reduced_motion_states(self) -> None:
         stylesheet = Path("static_files/css/theme.css").read_text(encoding="utf-8")
 
         self.assertIn(".dark .mobile-app-nav", stylesheet)
+        self.assertIn(".navbar-profile .profile-menu", stylesheet)
         self.assertIn(":focus-visible", stylesheet)
         self.assertIn("@media (max-width: 22.5rem)", stylesheet)
         self.assertIn("env(safe-area-inset-bottom)", stylesheet)

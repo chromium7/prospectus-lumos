@@ -35,12 +35,12 @@
                 <button class="btn btn-sm btn-outline-secondary me-2 theme-toggle" type="button" onclick="toggleTheme()" aria-label="Toggle dark mode">
                     <i class="bi bi-moon"></i>
                 </button>
-                <div class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                <div class="nav-item dropdown navbar-profile">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                         <i class="bi bi-person-circle me-1"></i>
                         <span class="d-none d-sm-inline">{{ user.username }}</span>
                     </a>
-                    <ul class="dropdown-menu dropdown-menu-end">
+                    <ul class="dropdown-menu dropdown-menu-end profile-menu" aria-labelledby="navbarDropdown">
                         <li><a class="dropdown-item" href="{% url 'dashboard' %}">
                             <i class="bi bi-speedometer2 me-2"></i>Dashboard
                         </a></li>

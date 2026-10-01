@@ -434,6 +434,32 @@ body :focus-visible {
   min-height: 44px;
 }
 
+.navbar-profile {
+  position: relative;
+}
+
+.navbar-profile .profile-menu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  left: auto;
+  min-width: 11rem;
+  margin: 0;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  background: var(--card-bg);
+  box-shadow: 0 0.75rem 2rem rgba(17, 24, 39, 0.18);
+  z-index: 1080;
+}
+
+.navbar-profile .profile-menu .dropdown-item {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  border-radius: 0.5rem;
+}
+
 .app-empty-state {
   min-height: 18rem;
 }
@@ -477,7 +503,7 @@ body :focus-visible {
   }
 
   .footer {
-    margin-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+    margin-bottom: calc(5rem + env(safe-area-inset-bottom));
   }
 
   .mobile-app-nav {
@@ -487,9 +513,9 @@ body :focus-visible {
     bottom: 0;
     left: 0;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    min-height: calc(4.5rem + env(safe-area-inset-bottom));
+    min-height: calc(5rem + env(safe-area-inset-bottom));
     align-items: end;
-    padding: 0.25rem 0.25rem env(safe-area-inset-bottom);
+    padding: 0.25rem 0.25rem calc(0.625rem + env(safe-area-inset-bottom));
     border-top: 1px solid var(--border-color);
     background: var(--card-bg);
     box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.08);
@@ -509,6 +535,7 @@ body :focus-visible {
     font-size: 0.7rem;
     font-weight: 600;
     text-decoration: none;
+    padding: 0.5rem 0.125rem 0.25rem;
   }
 
   .mobile-app-nav__link i,
@@ -521,20 +548,28 @@ body :focus-visible {
   }
 
   .mobile-app-nav__add {
+    position: relative;
     align-self: end;
-    margin-top: -1.25rem;
+    margin-bottom: -1.25rem;
     color: var(--primary-color);
+    transform: translateY(-1.5rem);
   }
 
   .mobile-app-nav__add i {
     display: grid;
-    width: 3.25rem;
-    height: 3.25rem;
+    width: 3.5rem;
+    height: 3.5rem;
     place-items: center;
     border-radius: 50%;
     background: var(--primary-color);
     color: #fff;
     box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+  }
+
+  .mobile-app-nav .dropup {
+    display: flex;
+    min-width: 0;
+    align-items: stretch;
   }
 
   .mobile-more-menu {
