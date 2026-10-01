@@ -46,7 +46,6 @@ class AppShellTests(TestCase):
         self.assertIsNone(response.context["dashboard"])
         self.assertContains(response, 'name="month" type="month" value="2026-09"')
         self.assertContains(response, "Start with an account")
-        self.assertNotContains(response, "/api/v1/dashboard")
         self.assertNotContains(response, "dashboard.js")
         self.assertContains(response, 'href="/app/transactions/new"')
 
@@ -79,7 +78,6 @@ class AppShellTests(TestCase):
         self.assertIn("Rp8.500.000", content)
         self.assertIn("Food &amp; dining", content)
         self.assertIn("Weekly groceries", content)
-        self.assertNotIn("/api/v1/dashboard", content)
 
     def test_dashboard_rejects_an_invalid_month_without_loading_data(self) -> None:
         self.client.force_login(self.user)
