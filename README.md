@@ -90,6 +90,25 @@ Main application logic:
 - Views for authentication, dashboard, and analysis
 - Services for Google Sheets processing and data analysis
 
+#### Ledger App (`prospectus_lumos.apps.ledger`)
+The canonical ledger for budgeting entered by hand, independent of the Google
+Sheets import. Every row is owned directly by a `User`, money is `Decimal(15, 2)`
+in IDR, and dates are real `DateField`s:
+- `FinancialAccount` - cash, bank, e-wallet, credit, or investment; the balance is
+  always derived from the transactions, never stored
+- `Category` - an income or expense bucket, unique per user and type while active
+- `LedgerTransaction` - one income, expense, or transfer, soft-deleted via
+  `deleted_at`
+- `BudgetPeriod` / `BudgetAllocation` - what one month plans per expense category;
+  actuals are always computed
+- `services.py` - balances, month and category totals, budget detail, and the
+  report series, all scoped to one user
+
+Archiving an account or a category keeps it on the transactions that already use
+it but hides it from new entries. Transfers move balance between two accounts and
+never count as income or expense, so a credit-card purchase is an expense when it
+happens and paying the card off is a transfer.
+
 ### Key Features
 
 #### Google Sheets Integration

@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'prospectus_lumos.apps.ai_analysis',
     'prospectus_lumos.apps.documents',
     'prospectus_lumos.apps.financial_planning',
+    'prospectus_lumos.apps.ledger',
     'prospectus_lumos.apps.transactions',
 ]
 
