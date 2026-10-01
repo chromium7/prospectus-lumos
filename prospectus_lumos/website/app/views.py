@@ -28,7 +28,7 @@ def app_home_view(request: TypedHttpRequest) -> HttpResponse:
         request,
         "app/home.html",
         {
-            "dashboard_api_url": "/api/v1/dashboard",
+            "dashboard": None,
             "month": month,
             "month_error": month_error,
             "selected_tab": "app_home",

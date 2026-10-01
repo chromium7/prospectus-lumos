@@ -520,33 +520,6 @@ body :focus-visible {
   font-weight: 600;
 }
 
-.dashboard__state {
-  display: flex;
-  min-height: 12rem;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  padding: 2rem;
-  border: 1px solid var(--border-color);
-  border-radius: 1rem;
-  background: var(--card-bg);
-}
-
-.dashboard__state[hidden] {
-  display: none;
-}
-
-.dashboard__state--error {
-  justify-content: flex-start;
-  border-left: 4px solid var(--danger-color);
-}
-
-.dashboard__state--error > i {
-  align-self: flex-start;
-  color: var(--danger-color);
-  font-size: 1.5rem;
-}
-
 .dashboard__summary {
   margin: 1.5rem 0 1rem;
   font-size: clamp(1.25rem, 4vw, 1.75rem);

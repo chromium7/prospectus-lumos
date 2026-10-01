@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 
-{% load static %}
+{% load formatting %}
 
 {% block title %}Dashboard - Prospectus Lumos{% endblock %}
 
 {% block content %}
-<div class="dashboard" data-dashboard data-api-url="{{ dashboard_api_url }}" data-month="{{ month }}">
+<div class="dashboard">
 <header class="dashboard__header">
     <div>
         <p class="dashboard__eyebrow">Your money this month</p>
         <h1 class="h2 mb-1">Dashboard</h1>
-        <p class="text-muted mb-0" data-dashboard-greeting>See what came in, what went out, and what is left.</p>
+        <p class="text-muted mb-0">See what came in, what went out, and what is left.</p>
     </div>
     <div class="dashboard__controls">
         <a class="btn btn-primary dashboard__add" href="/app/transactions/new">
@@ -31,22 +31,8 @@
     <h2 class="h5">That month does not look right</h2>
     <p class="mb-0">{{ month_error }}</p>
 </section>
-{% else %}
-<section class="dashboard__state mt-4" data-dashboard-loading aria-live="polite" aria-busy="true">
-    <span class="spinner-border text-primary" aria-hidden="true"></span>
-    <span>Gathering your month…</span>
-</section>
-
-<section class="dashboard__state dashboard__state--error mt-4" data-dashboard-error role="alert" tabindex="-1" hidden>
-    <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
-    <div>
-        <h2 class="h5 mb-1">We could not load your dashboard</h2>
-        <p class="mb-3" data-dashboard-error-message>Your information is safe. Check your connection and try again.</p>
-        <button class="btn btn-outline-primary" type="button" data-dashboard-retry>Try again</button>
-    </div>
-</section>
-
-<section class="card app-empty-state mt-4" data-dashboard-empty hidden aria-labelledby="dashboard-empty-title">
+{% elif not dashboard %}
+<section class="card app-empty-state mt-4" aria-labelledby="dashboard-empty-title">
     <div class="card-body p-4 p-md-5 text-center">
         <i class="bi bi-wallet2 display-5 text-primary" aria-hidden="true"></i>
         <h2 class="h4 mt-3" id="dashboard-empty-title">Start with an account</h2>
@@ -54,21 +40,21 @@
         <a class="btn btn-primary mt-3" href="/app/accounts">Add your first account</a>
     </div>
 </section>
-
-<div data-dashboard-content hidden>
-    <p class="dashboard__summary" data-dashboard-summary></p>
+{% else %}
+<div>
+    <p class="dashboard__summary">{{ dashboard.summary }}</p>
     <section class="dashboard__totals" aria-label="Monthly totals">
         <article class="dashboard-stat">
             <span><i class="bi bi-arrow-down-left-circle" aria-hidden="true"></i> Income</span>
-            <strong data-dashboard-income>Rp0</strong>
+            <strong>{{ dashboard.totals.income|idr }}</strong>
         </article>
         <article class="dashboard-stat">
             <span><i class="bi bi-arrow-up-right-circle" aria-hidden="true"></i> Spent</span>
-            <strong data-dashboard-expense>Rp0</strong>
+            <strong>{{ dashboard.totals.expense|idr }}</strong>
         </article>
         <article class="dashboard-stat dashboard-stat--primary">
             <span><i class="bi bi-wallet2" aria-hidden="true"></i> Remaining</span>
-            <strong data-dashboard-net>Rp0</strong>
+            <strong>{{ dashboard.totals.remaining|idr }}</strong>
         </article>
     </section>
 
@@ -79,7 +65,21 @@
                     <div><p class="dashboard__eyebrow">Monthly plan</p><h2 class="h4" id="budget-progress-title">Budget progress</h2></div>
                     <a href="/app/budgets/{{ month }}">View plan</a>
                 </div>
-                <div data-dashboard-budget></div>
+                <div>
+                    {% for category in dashboard.budget_categories %}
+                    <div class="budget-progress-row">
+                        <div>
+                            <strong>{{ category.name }}</strong>
+                            <span>{% if category.remaining < 0 %}{{ category.remaining|idr }} over{% else %}{{ category.remaining|idr }} left{% endif %}</span>
+                        </div>
+                        <div class="progress" role="progressbar" aria-label="{{ category.name }}: {{ category.percentage_used|floatformat:0 }}% used" aria-valuenow="{{ category.percentage_used|floatformat:0 }}" aria-valuemin="0" aria-valuemax="100">
+                            <div class="progress-bar" style="width: {{ category.percentage_used|floatformat:0 }}%"></div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="text-muted mb-0">No budget is set for this month yet.</p>
+                    {% endfor %}
+                </div>
             </div>
         </section>
         <section class="card dashboard-panel" aria-labelledby="recent-activity-title">
@@ -88,15 +88,21 @@
                     <div><p class="dashboard__eyebrow">Latest changes</p><h2 class="h4" id="recent-activity-title">Recent activity</h2></div>
                     <a href="/app/transactions">View all</a>
                 </div>
-                <ul class="dashboard-activity" data-dashboard-activity></ul>
+                <ul class="dashboard-activity">
+                    {% for transaction in dashboard.recent_activity %}
+                    <li>
+                        <span class="dashboard-activity__icon" aria-hidden="true"><i class="bi bi-arrow-left-right"></i></span>
+                        <span class="dashboard-activity__label"><strong>{{ transaction.label }}</strong><small>{{ transaction.occurred_on }}</small></span>
+                        <strong class="dashboard-activity__amount">{% if transaction.type == 'expense' %}−{% elif transaction.type == 'income' %}+{% endif %}{{ transaction.amount|idr }}</strong>
+                    </li>
+                    {% empty %}
+                    <li class="text-muted">No transactions in this month yet.</li>
+                    {% endfor %}
+                </ul>
             </div>
         </section>
     </div>
 </div>
 {% endif %}
 </div>
-{% endblock %}
-
-{% block extra_js %}
-{% if not month_error %}<script src="{% static 'js/dashboard.js' %}"></script>{% endif %}
 {% endblock %}
