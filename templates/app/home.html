@@ -1,36 +1,102 @@
 {% extends "base.html" %}
 
-{% block title %}Budgeting Home - Prospectus Lumos{% endblock %}
+{% load static %}
+
+{% block title %}Dashboard - Prospectus Lumos{% endblock %}
 
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+<div class="dashboard" data-dashboard data-api-url="{{ dashboard_api_url }}" data-month="{{ month }}">
+<header class="dashboard__header">
     <div>
-        <h1 class="h2 mb-1">Budgeting Home</h1>
-        <p class="text-muted mb-0">Manage day-to-day money without leaving the tools you already use.</p>
+        <p class="dashboard__eyebrow">Your money this month</p>
+        <h1 class="h2 mb-1">Dashboard</h1>
+        <p class="text-muted mb-0" data-dashboard-greeting>See what came in, what went out, and what is left.</p>
     </div>
-</div>
+    <div class="dashboard__controls">
+        <a class="btn btn-primary dashboard__add" href="/app/transactions/new">
+            <i class="bi bi-plus-lg" aria-hidden="true"></i> Add transaction
+        </a>
+        <form class="dashboard__month" method="get" aria-label="Choose dashboard month">
+            <label for="dashboard-month">Month</label>
+            <div class="input-group">
+                <input class="form-control" id="dashboard-month" name="month" type="month" value="{{ month }}" required>
+                <button class="btn btn-outline-primary" type="submit">View</button>
+            </div>
+        </form>
+    </div>
+</header>
 
-<section class="card app-empty-state" aria-labelledby="app-foundation-title">
+{% if month_error %}
+<section class="alert alert-danger mt-4" role="alert" tabindex="-1" data-month-error>
+    <h2 class="h5">That month does not look right</h2>
+    <p class="mb-0">{{ month_error }}</p>
+</section>
+{% else %}
+<section class="dashboard__state mt-4" data-dashboard-loading aria-live="polite" aria-busy="true">
+    <span class="spinner-border text-primary" aria-hidden="true"></span>
+    <span>Gathering your month…</span>
+</section>
+
+<section class="dashboard__state dashboard__state--error mt-4" data-dashboard-error role="alert" tabindex="-1" hidden>
+    <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+    <div>
+        <h2 class="h5 mb-1">We could not load your dashboard</h2>
+        <p class="mb-3" data-dashboard-error-message>Your information is safe. Check your connection and try again.</p>
+        <button class="btn btn-outline-primary" type="button" data-dashboard-retry>Try again</button>
+    </div>
+</section>
+
+<section class="card app-empty-state mt-4" data-dashboard-empty hidden aria-labelledby="dashboard-empty-title">
     <div class="card-body p-4 p-md-5 text-center">
         <i class="bi bi-wallet2 display-5 text-primary" aria-hidden="true"></i>
-        <h2 class="h4 mt-3" id="app-foundation-title">Your budgeting space is ready</h2>
-        <p class="text-muted mx-auto app-empty-state__copy">
-            Accounts, activity, and monthly plans will appear here as the next pages are added.
-        </p>
-        <div class="d-flex flex-column flex-sm-row justify-content-center gap-2 mt-4">
-            <a class="btn btn-primary" href="{% url 'document_list' %}">Open your documents</a>
-            <a class="btn btn-outline-primary" href="{% url 'freedom_plan_list' %}">View Financial Freedom plans</a>
-        </div>
+        <h2 class="h4 mt-3" id="dashboard-empty-title">Start with an account</h2>
+        <p class="text-muted mx-auto app-empty-state__copy">Add the place you keep money, then record your first transaction.</p>
+        <a class="btn btn-primary mt-3" href="/app/accounts">Add your first account</a>
     </div>
 </section>
 
-<section class="card mt-4">
-    <div class="card-body p-4 d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
-        <div>
-            <h2 class="h5 mb-1">Your existing analyzers are still here</h2>
-            <p class="text-muted mb-0">Review income, spending, categories, and portfolio trends at any time.</p>
-        </div>
-        <a class="btn btn-outline-secondary" href="{% url 'portfolio_analyzer' %}">Open Portfolio Analyzer</a>
+<div data-dashboard-content hidden>
+    <p class="dashboard__summary" data-dashboard-summary></p>
+    <section class="dashboard__totals" aria-label="Monthly totals">
+        <article class="dashboard-stat">
+            <span><i class="bi bi-arrow-down-left-circle" aria-hidden="true"></i> Income</span>
+            <strong data-dashboard-income>Rp0</strong>
+        </article>
+        <article class="dashboard-stat">
+            <span><i class="bi bi-arrow-up-right-circle" aria-hidden="true"></i> Spent</span>
+            <strong data-dashboard-expense>Rp0</strong>
+        </article>
+        <article class="dashboard-stat dashboard-stat--primary">
+            <span><i class="bi bi-wallet2" aria-hidden="true"></i> Remaining</span>
+            <strong data-dashboard-net>Rp0</strong>
+        </article>
+    </section>
+
+    <div class="dashboard__grid">
+        <section class="card dashboard-panel" aria-labelledby="budget-progress-title">
+            <div class="card-body">
+                <div class="dashboard-panel__heading">
+                    <div><p class="dashboard__eyebrow">Monthly plan</p><h2 class="h4" id="budget-progress-title">Budget progress</h2></div>
+                    <a href="/app/budgets/{{ month }}">View plan</a>
+                </div>
+                <div data-dashboard-budget></div>
+            </div>
+        </section>
+        <section class="card dashboard-panel" aria-labelledby="recent-activity-title">
+            <div class="card-body">
+                <div class="dashboard-panel__heading">
+                    <div><p class="dashboard__eyebrow">Latest changes</p><h2 class="h4" id="recent-activity-title">Recent activity</h2></div>
+                    <a href="/app/transactions">View all</a>
+                </div>
+                <ul class="dashboard-activity" data-dashboard-activity></ul>
+            </div>
+        </section>
     </div>
-</section>
+</div>
+{% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if not month_error %}<script src="{% static 'js/dashboard.js' %}"></script>{% endif %}
 {% endblock %}
