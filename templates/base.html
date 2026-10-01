@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>{% block title %}Prospectus Lumos - Financial Tracker{% endblock %}</title>
 
     <!-- Bootstrap CSS -->
@@ -15,25 +15,32 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+
+    <div class="offline-banner" data-offline-banner role="status" hidden>
+        <i class="bi bi-cloud-slash" aria-hidden="true"></i>
+        You’re offline. Saved information is still safe.
+    </div>
+
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom">
         <div class="container-fluid">
-            <a class="navbar-brand" href="{% url 'dashboard' %}">
+            <a class="navbar-brand" href="{% if user.is_authenticated %}{% url 'app:home' %}{% else %}{% url 'dashboard' %}{% endif %}">
                 <i class="bi bi-graph-up-arrow me-2"></i>
                 Prospectus Lumos
             </a>
 
             {% if user.is_authenticated %}
-            <div class="navbar-nav ms-auto">
-                <button class="btn btn-sm btn-outline-secondary me-2" type="button" onclick="toggleTheme()" aria-label="Toggle dark mode">
+            <div class="navbar-nav ms-auto flex-row align-items-center">
+                <button class="btn btn-sm btn-outline-secondary me-2 theme-toggle" type="button" onclick="toggleTheme()" aria-label="Toggle dark mode">
                     <i class="bi bi-moon"></i>
                 </button>
-                <div class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                <div class="nav-item dropdown navbar-profile">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                         <i class="bi bi-person-circle me-1"></i>
-                        {{ user.username }}
+                        <span class="d-none d-sm-inline">{{ user.username }}</span>
                     </a>
-                    <ul class="dropdown-menu dropdown-menu-end">
+                    <ul class="dropdown-menu dropdown-menu-end profile-menu" aria-labelledby="navbarDropdown">
                         <li><a class="dropdown-item" href="{% url 'dashboard' %}">
                             <i class="bi bi-speedometer2 me-2"></i>Dashboard
                         </a></li>
@@ -52,8 +59,27 @@
         <div class="row">
             {% if user.is_authenticated %}
             <!-- Sidebar -->
-            <div class="col-lg-2 col-md-3 sidebar p-3">
-                <nav class="nav flex-column">
+            <aside class="col-lg-2 col-md-3 sidebar p-3 d-none d-md-block">
+                <nav class="nav flex-column" aria-label="Primary navigation">
+                    <p class="sidebar-heading">Budgeting</p>
+                    <a class="nav-link {% if selected_tab == 'app_home' %}active{% endif %}" href="{% url 'app:home' %}"{% if selected_tab == 'app_home' %} aria-current="page"{% endif %}>
+                        <i class="bi bi-house me-2"></i>
+                        Home
+                    </a>
+                    <a class="nav-link {% if selected_tab == 'app_activity' %}active{% endif %}" href="/app/transactions"{% if selected_tab == 'app_activity' %} aria-current="page"{% endif %}>
+                        <i class="bi bi-list-ul me-2"></i>
+                        Activity
+                    </a>
+                    <a class="nav-link {% if selected_tab == 'app_plan' %}active{% endif %}" href="/app/budgets/current"{% if selected_tab == 'app_plan' %} aria-current="page"{% endif %}>
+                        <i class="bi bi-wallet2 me-2"></i>
+                        Plan
+                    </a>
+                    <a class="nav-link {% if selected_tab == 'app_insights' %}active{% endif %}" href="/app/reports"{% if selected_tab == 'app_insights' %} aria-current="page"{% endif %}>
+                        <i class="bi bi-bar-chart me-2"></i>
+                        Insights
+                    </a>
+
+                    <p class="sidebar-heading mt-4">Existing tools</p>
                     <a class="nav-link {% if selected_tab == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
                         <i class="bi bi-speedometer2 me-2"></i>
                         Dashboard
@@ -91,30 +117,65 @@
                         AI Settings
                     </a>
                 </nav>
-            </div>
+            </aside>
 
             <!-- Main Content -->
-            <div class="col-lg-10 col-md-9 p-4">
+            <main class="col-lg-10 col-md-9 p-4 app-content" id="main-content" tabindex="-1">
             {% else %}
-            <div class="col-12 p-4">
+            <main class="col-12 p-4" id="main-content" tabindex="-1">
             {% endif %}
 
                 <!-- Messages -->
                 {% if messages %}
+                    <div aria-live="polite">
                     {% for message in messages %}
                         <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
                             {{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
                         </div>
                     {% endfor %}
+                    </div>
                 {% endif %}
+
+                <div class="visually-hidden" data-app-live-region aria-live="polite"></div>
 
                 <!-- Page Content -->
                 {% block content %}
                 {% endblock %}
-            </div>
+            </main>
         </div>
     </div>
+
+    {% if user.is_authenticated %}
+    <nav class="mobile-app-nav d-md-none" aria-label="Mobile navigation">
+        <a class="mobile-app-nav__link {% if selected_tab == 'app_home' %}active{% endif %}" href="{% url 'app:home' %}"{% if selected_tab == 'app_home' %} aria-current="page"{% endif %}>
+            <i class="bi bi-house" aria-hidden="true"></i><span>Home</span>
+        </a>
+        <a class="mobile-app-nav__link {% if selected_tab == 'app_activity' %}active{% endif %}" href="/app/transactions"{% if selected_tab == 'app_activity' %} aria-current="page"{% endif %}>
+            <i class="bi bi-list-ul" aria-hidden="true"></i><span>Activity</span>
+        </a>
+        <a class="mobile-app-nav__add" href="/app/transactions/new" aria-label="Add transaction">
+            <i class="bi bi-plus-lg" aria-hidden="true"></i><span>Add</span>
+        </a>
+        <a class="mobile-app-nav__link {% if selected_tab == 'app_plan' %}active{% endif %}" href="/app/budgets/current"{% if selected_tab == 'app_plan' %} aria-current="page"{% endif %}>
+            <i class="bi bi-wallet2" aria-hidden="true"></i><span>Plan</span>
+        </a>
+        <div class="dropup">
+            <button class="mobile-app-nav__link" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-three-dots" aria-hidden="true"></i><span>More</span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end mobile-more-menu">
+                <li><a class="dropdown-item" href="/app/reports">Insights</a></li>
+                <li><a class="dropdown-item" href="{% url 'document_list' %}">Documents</a></li>
+                <li><a class="dropdown-item" href="{% url 'portfolio_analyzer' %}">Portfolio Analyzer</a></li>
+                <li><a class="dropdown-item" href="{% url 'income_analyzer' %}">Income Analyzer</a></li>
+                <li><a class="dropdown-item" href="{% url 'expense_analyzer' %}">Expense Analyzer</a></li>
+                <li><a class="dropdown-item" href="{% url 'category_analyzer' %}">Category Analyzer</a></li>
+                <li><a class="dropdown-item" href="{% url 'freedom_plan_list' %}">Financial Freedom</a></li>
+            </ul>
+        </div>
+    </nav>
+    {% endif %}
 
     <!-- Footer -->
     <footer class="footer py-3 mt-auto">
@@ -129,6 +190,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script src="{% static 'js/loading-indicator.js' %}"></script>
+    <script src="{% static 'js/app-shell.js' %}"></script>
 
     {% block extra_js %}{% endblock %}
     <script>

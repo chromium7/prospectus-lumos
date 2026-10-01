@@ -1,0 +1,8 @@
+<section class="card app-page-state app-page-state--{{ state|default:'empty' }}"{% if state_id %} aria-labelledby="{{ state_id }}"{% endif %}{% if state == 'loading' %} aria-busy="true"{% endif %}{% if state == 'error' %} role="alert"{% else %} role="status"{% endif %}>
+    <div class="card-body p-4 text-center">
+        {% if state == 'loading' %}<span class="spinner-border text-primary mb-3" aria-hidden="true"></span>{% endif %}
+        <h2 class="h5"{% if state_id %} id="{{ state_id }}"{% endif %}>{{ title }}</h2>
+        {% if message %}<p class="text-muted mb-0">{{ message }}</p>{% endif %}
+        {% if action_url and action_label %}<a class="btn btn-primary mt-3" href="{{ action_url }}">{{ action_label }}</a>{% endif %}
+    </div>
+</section>
