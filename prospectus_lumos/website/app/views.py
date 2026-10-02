@@ -8,16 +8,10 @@ from django.urls import reverse
 from django.utils import timezone
 
 from prospectus_lumos.apps.transactions.models import Transaction
-from prospectus_lumos.core.utils import (
-    TypedHttpRequest,
-    consume_submission_token,
-    create_submission_token,
-    safe_return_url,
-    submission_token_status,
-)
+from prospectus_lumos.core.utils import TypedHttpRequest, safe_return_url
 
 from .forms import TransactionForm
-from .utils import PENDING_TOKEN_KEY, USED_TOKEN_KEY, recent_transaction_categories
+from .utils import recent_transaction_categories
 
 
 MONTH_PATTERN = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
@@ -56,26 +50,8 @@ def transaction_create_view(request: TypedHttpRequest) -> HttpResponse:
     fallback_url = reverse("app:home")
     if request.method == "POST":
         form = TransactionForm(request.POST, user=request.user)
-        token = request.POST.get("submission_token", "")
-        token_status = submission_token_status(
-            request,
-            token,
-            pending_key=PENDING_TOKEN_KEY,
-            used_key=USED_TOKEN_KEY,
-        )
-        if token_status == "used":
-            messages.info(request, "That transaction was already saved. No duplicate was created.")
-            return redirect(safe_return_url(request, fallback=fallback_url))
-        if token_status == "invalid":
-            form.add_error(None, "This form has expired. Reload the page and try again.")
-        elif form.is_valid():
+        if form.is_valid():
             saved = form.save()
-            consume_submission_token(
-                request,
-                token,
-                pending_key=PENDING_TOKEN_KEY,
-                used_key=USED_TOKEN_KEY,
-            )
             messages.success(request, f"{saved.get_transaction_type_display()} saved.")
             if request.POST.get("save_action") == "save_another":
                 return redirect("app:transaction_create")
@@ -84,7 +60,6 @@ def transaction_create_view(request: TypedHttpRequest) -> HttpResponse:
         form = TransactionForm(
             user=request.user,
             initial={
-                "submission_token": create_submission_token(request, pending_key=PENDING_TOKEN_KEY),
                 "transaction_type": Transaction.TransactionType.EXPENSE,
                 "date": timezone.localdate(),
             },

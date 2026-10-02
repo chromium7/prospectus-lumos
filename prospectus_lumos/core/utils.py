@@ -1,6 +1,5 @@
 import pathlib
 from typing import Any
-from uuid import uuid4
 
 from django.http import HttpRequest
 from django.template.defaultfilters import slugify
@@ -12,51 +11,6 @@ from prospectus_lumos.apps.accounts.models import User
 
 class TypedHttpRequest(HttpRequest):
     user: User
-
-
-def create_submission_token(request: TypedHttpRequest, *, pending_key: str, limit: int = 20) -> str:
-    """Issue a bounded session-backed token for an idempotent HTML form."""
-
-    token = uuid4().hex
-    pending = list(request.session.get(pending_key, []))
-    pending.append(token)
-    request.session[pending_key] = pending[-limit:]
-    return token
-
-
-def submission_token_status(
-    request: TypedHttpRequest,
-    token: str,
-    *,
-    pending_key: str,
-    used_key: str,
-) -> str:
-    """Return whether a submitted form token is pending, used, or invalid."""
-
-    if token in request.session.get(used_key, []):
-        return "used"
-    if token in request.session.get(pending_key, []):
-        return "pending"
-    return "invalid"
-
-
-def consume_submission_token(
-    request: TypedHttpRequest,
-    token: str,
-    *,
-    pending_key: str,
-    used_key: str,
-    limit: int = 20,
-) -> None:
-    """Move a successful form token into a bounded replay-protection set."""
-
-    pending = list(request.session.get(pending_key, []))
-    if token in pending:
-        pending.remove(token)
-    used = list(request.session.get(used_key, []))
-    used.append(token)
-    request.session[pending_key] = pending
-    request.session[used_key] = used[-limit:]
 
 
 def safe_return_url(request: HttpRequest, *, fallback: str) -> str:

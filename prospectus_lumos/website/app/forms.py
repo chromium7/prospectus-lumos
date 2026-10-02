@@ -11,7 +11,6 @@ from prospectus_lumos.apps.transactions.models import Transaction
 class TransactionForm(forms.ModelForm):
     """Validate a manual income or expense owned directly by a user."""
 
-    submission_token = forms.CharField(widget=forms.HiddenInput())
     transaction_type = forms.ChoiceField(
         choices=Transaction.TransactionType.choices,
         widget=forms.RadioSelect(),
@@ -20,7 +19,7 @@ class TransactionForm(forms.ModelForm):
 
     class Meta:
         model = Transaction
-        fields = ("submission_token", "transaction_type", "amount", "category", "date", "description")
+        fields = ("transaction_type", "amount", "category", "date", "description")
         widgets = {
             "transaction_type": forms.RadioSelect(),
             "amount": forms.NumberInput(

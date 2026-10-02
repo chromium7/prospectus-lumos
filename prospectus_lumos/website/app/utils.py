@@ -3,9 +3,6 @@ from django.db.models import Max
 
 from prospectus_lumos.apps.transactions.models import Transaction
 
-PENDING_TOKEN_KEY = "transaction_form_pending_tokens"
-USED_TOKEN_KEY = "transaction_form_used_tokens"
-
 
 def recent_transaction_categories(user: User, *, limit: int = 5) -> list[str]:
     """Return distinct recently used category names owned by a user."""
