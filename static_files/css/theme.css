@@ -645,6 +645,132 @@ body :focus-visible {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* Add transaction */
+.transaction-page {
+  max-width: 52rem;
+  margin: 0 auto;
+}
+
+.transaction-page__header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.transaction-page__header .btn,
+.transaction-form__actions .btn {
+  min-height: 44px;
+}
+
+.transaction-form {
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+}
+
+.transaction-type {
+  margin: 0 0 1.5rem;
+  padding: 0;
+  border: 0;
+}
+
+.transaction-type legend,
+.transaction-form label {
+  margin-bottom: 0.4rem;
+  font-weight: 650;
+}
+
+.transaction-type__options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.transaction-type__option {
+  position: relative;
+  margin: 0;
+  cursor: pointer;
+}
+
+.transaction-type__option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.transaction-type__option span {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.65rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  background: var(--card-bg);
+  color: var(--text-color);
+}
+
+.transaction-type__option input:checked + span {
+  border-color: var(--primary-color);
+  background: color-mix(in srgb, var(--primary-color) 10%, var(--card-bg));
+  color: var(--primary-color);
+  box-shadow: inset 0 0 0 1px var(--primary-color);
+}
+
+.transaction-type__option input:focus-visible + span {
+  outline: 3px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.transaction-form__amount {
+  max-width: 28rem;
+  margin-bottom: 1.5rem;
+}
+
+.transaction-amount {
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
+.transaction-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.transaction-field {
+  min-width: 0;
+}
+
+.transaction-field--wide {
+  grid-column: 1 / -1;
+}
+
+.transaction-offline-note {
+  display: flex;
+  gap: 0.65rem;
+  margin-top: 1.5rem;
+  padding: 0.8rem 1rem;
+  border-radius: 0.75rem;
+  background: var(--sidebar-bg);
+  color: var(--muted-text);
+  font-size: 0.9rem;
+}
+
+.transaction-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-color: var(--border-color);
+  background: var(--card-bg);
+}
+
 .offline-banner {
   position: fixed;
   z-index: 1080;
@@ -807,6 +933,41 @@ body :focus-visible {
   .dashboard-stat strong {
     text-align: right;
   }
+
+  .transaction-page__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .transaction-page__header .btn {
+    align-self: start;
+  }
+
+  .transaction-form {
+    margin-right: -1rem;
+    margin-left: -1rem;
+    border-right: 0;
+    border-left: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .transaction-form__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .transaction-field--wide {
+    grid-column: auto;
+  }
+
+  .transaction-form__actions {
+    position: sticky;
+    bottom: calc(4.9rem + env(safe-area-inset-bottom));
+    z-index: 2;
+    align-items: stretch;
+    flex-direction: column;
+    padding: 0.75rem 1rem;
+  }
 }
 
 @media (max-width: 22.5rem) {
@@ -825,6 +986,10 @@ body :focus-visible {
   .mobile-app-nav {
     padding-right: 0;
     padding-left: 0;
+  }
+
+  .transaction-type__options {
+    grid-template-columns: 1fr;
   }
 }
 
