@@ -54,6 +54,7 @@ class DocumentSource(models.Model):
     class SourceType(models.TextChoices):
         GOOGLE_DRIVE = "google_drive", "Google Drive"
         DIRECT_UPLOAD = "direct_upload", "Direct Upload"
+        MANUAL = "manual", "Manual"
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="document_sources")
     source_type = models.CharField(max_length=20, choices=SourceType.choices)
