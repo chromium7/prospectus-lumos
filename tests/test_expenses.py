@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tempfile
+from decimal import Decimal
 from tempfile import TemporaryDirectory
 from unittest.mock import patch, MagicMock
 
@@ -114,6 +115,71 @@ class ExpenseSheetServiceSyncTests(TestCase):
         self.assertEqual(docs, [])
         existing.refresh_from_db()
         self.assertEqual(existing.google_sheet_id, "SAME")
+
+    @patch("prospectus_lumos.apps.expenses.services.GoogleDriveBackend")
+    def test_sync_replaces_existing_month_when_sheet_id_changes(self, backend_cls: MagicMock) -> None:
+        backend = MagicMock()
+        backend_cls.return_value = backend
+        backend.list_monthly_budget_files.return_value = [
+            File(key="replacement", name="Monthly Budget Aug 2025", extension="gsheet", size=0)
+        ]
+        backend.parse_monthly_budget_sheet.return_value = (
+            [
+                {
+                    "date": "31/8/2025",
+                    "amount": "25000.50",
+                    "description": "Month-end dinner",
+                    "category": "Food & Dining",
+                    "type": "expenses",
+                }
+            ],
+            [
+                {
+                    "date": "1/8/2025",
+                    "amount": "750000.25",
+                    "description": "Salary",
+                    "category": "Primary Income",
+                    "type": "income",
+                }
+            ],
+        )
+        existing = Document.objects.create(
+            user=self.user,
+            source=self.source,
+            month=8,
+            year=2025,
+            google_sheet_id="original",
+            total_income="100.00",
+            total_expenses="40.00",
+            income_count=1,
+            expenses_count=1,
+        )
+        Transaction.objects.create(
+            document=existing,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            date="2/8/2025",
+            amount="40.00",
+            description="Superseded row",
+            category="Old category",
+        )
+
+        documents = ExpenseSheetService(self.user).sync_google_drive_documents(self.source)
+
+        self.assertEqual([document.pk for document in documents], [existing.pk])
+        existing.refresh_from_db()
+        self.assertEqual(existing.google_sheet_id, "replacement")
+        self.assertEqual(existing.total_income, Decimal("750000.25"))
+        self.assertEqual(existing.total_expenses, Decimal("25000.50"))
+        self.assertEqual(existing.income_count, 1)
+        self.assertEqual(existing.expenses_count, 1)
+        self.assertFalse(existing.transactions.filter(description="Superseded row").exists())
+        self.assertCountEqual(
+            existing.transactions.values_list("transaction_type", "date", "category"),
+            [
+                (Transaction.TransactionType.EXPENSE, "31/8/2025", "Food & Dining"),
+                (Transaction.TransactionType.INCOME, "1/8/2025", "Primary Income"),
+            ],
+        )
 
 
 class DocumentDetailViewTests(TestCase):
