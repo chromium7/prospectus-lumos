@@ -185,6 +185,7 @@ class ExpenseSheetService:
                 Transaction(
                     document=document,
                     transaction_type="expense",
+                    origin=Transaction.Origin.GOOGLE_SHEETS,
                     date=expense.get("date", ""),
                     amount=Decimal(str(expense.get("amount", 0))),
                     description=expense.get("description", ""),
@@ -198,6 +199,7 @@ class ExpenseSheetService:
                 Transaction(
                     document=document,
                     transaction_type="income",
+                    origin=Transaction.Origin.GOOGLE_SHEETS,
                     date=inc.get("date", ""),
                     amount=Decimal(str(inc.get("amount", 0))),
                     description=inc.get("description", ""),

@@ -101,6 +101,7 @@ class TransactionCreatePageTests(TestCase):
         saved = Transaction.objects.get()
         self.assertEqual(saved.user, self.user)
         self.assertIsNone(saved.document)
+        self.assertEqual(saved.origin, Transaction.Origin.MANUAL)
         self.assertEqual(saved.amount, Decimal("125000.00"))
         self.assertEqual(saved.category, "Groceries")
         self.assertEqual(saved.date, "2026-09-30")

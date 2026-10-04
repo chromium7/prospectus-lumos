@@ -8,6 +8,12 @@ from prospectus_lumos.apps.transactions.models import Transaction
 
 
 class TransactionModelTests(TestCase):
+    def test_origin_contract_is_limited_to_supported_sources(self) -> None:
+        self.assertEqual(
+            Transaction.Origin.values,
+            ["manual", "google_sheets", "direct_upload"],
+        )
+
     def test_manual_transaction_can_belong_directly_to_a_user(self) -> None:
         user = User.objects.create_user(username="transaction-owner", password="pass")
 
@@ -21,6 +27,7 @@ class TransactionModelTests(TestCase):
         )
 
         self.assertIsNone(entry.document)
+        self.assertEqual(entry.origin, Transaction.Origin.MANUAL)
         self.assertEqual(list(Transaction.for_user(user)), [entry])
 
     def test_transaction_requires_a_user_or_import_document(self) -> None:
