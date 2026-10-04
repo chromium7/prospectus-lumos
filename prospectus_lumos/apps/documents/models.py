@@ -22,6 +22,7 @@ class Document(models.Model):
     csv_file = models.FileField(
         upload_to="documents/csv/",
         validators=[FileExtensionValidator(allowed_extensions=["csv"])],
+        blank=True,
         help_text="Processed CSV file containing expenses and income",
     )
     total_expenses = models.DecimalField(
