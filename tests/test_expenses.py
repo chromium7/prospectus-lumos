@@ -91,6 +91,7 @@ class ExpenseSheetServiceSyncTests(TestCase):
 
         # Transactions created
         txs = Transaction.objects.filter(document=doc).order_by("transaction_type")
+        self.assertEqual({tx.origin for tx in txs}, {Transaction.Origin.GOOGLE_SHEETS})
         self.assertEqual(txs.count(), 2)
         self.assertEqual({t.transaction_type for t in txs}, {"expense", "income"})
 
