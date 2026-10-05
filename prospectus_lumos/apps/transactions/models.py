@@ -6,11 +6,16 @@ from django.db.models import Q, QuerySet
 
 
 class Transaction(models.Model):
-    """Individual transaction records extracted from CSV files"""
+    """Individual imported or manually entered transaction records."""
 
     class TransactionType(models.TextChoices):
         EXPENSE = "expense", "Expense"
         INCOME = "income", "Income"
+
+    class Origin(models.TextChoices):
+        MANUAL = "manual", "Manual"
+        GOOGLE_SHEETS = "google_sheets", "Google Sheets"
+        DIRECT_UPLOAD = "direct_upload", "Direct Upload"
 
     user = models.ForeignKey(
         User,
@@ -31,6 +36,7 @@ class Transaction(models.Model):
     amount = models.DecimalField(max_digits=15, decimal_places=2)
     description = models.CharField(max_length=500)
     category = models.CharField(max_length=100, blank=True)
+    origin = models.CharField(max_length=20, choices=Origin.choices, default=Origin.MANUAL)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
