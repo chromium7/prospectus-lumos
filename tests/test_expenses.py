@@ -13,12 +13,14 @@ from django.urls import reverse
 from libraries.google_cloud.tuples import File
 from prospectus_lumos.apps.accounts.models import GoogleDriveCredentials, DocumentSource
 from prospectus_lumos.apps.documents.models import Document
-from prospectus_lumos.apps.documents.services import resolve_monthly_document
+from prospectus_lumos.apps.documents.services import recalculate_document_summary, resolve_monthly_document
 from prospectus_lumos.apps.expenses.services import ExpenseAnalyzerService, ExpenseSheetService
 from prospectus_lumos.apps.transactions.models import Transaction
 
 
-class ExpenseSheetServiceSyncTests(TestCase):
+class GoogleDriveSyncTestCase(TestCase):
+    """Shared Google Drive source fixture for the import and re-sync services."""
+
     def setUp(self) -> None:
         self.tempdir = TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
@@ -46,6 +48,8 @@ class ExpenseSheetServiceSyncTests(TestCase):
             is_active=True,
         )
 
+
+class ExpenseSheetServiceSyncTests(GoogleDriveSyncTestCase):
     @patch("prospectus_lumos.apps.expenses.services.GoogleDriveBackend")
     def test_sync_creates_document_csv_and_transactions(self, backend_cls: MagicMock) -> None:
         backend = MagicMock()
@@ -132,6 +136,78 @@ class ExpenseSheetServiceSyncTests(TestCase):
         self.assertEqual(manual_document.income_count, 1)
 
     @patch("prospectus_lumos.apps.expenses.services.GoogleDriveBackend")
+    def test_sync_attaches_the_importing_source_to_an_adopted_manual_month(self, backend_cls: MagicMock) -> None:
+        manual_document = resolve_monthly_document(user=self.user, year=2025, month=8)
+        manual_source = manual_document.source
+        self.assertEqual(manual_source.source_type, DocumentSource.SourceType.MANUAL)
+        manual_row = Transaction.objects.create(
+            document=manual_document,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            origin=Transaction.Origin.MANUAL,
+            date="3/8/2025",
+            amount=Decimal("2000"),
+            description="Manual coffee",
+        )
+
+        backend = MagicMock()
+        backend_cls.return_value = backend
+        backend.list_monthly_budget_files.return_value = [
+            File(key="sheet123", name="Monthly Budget Aug 2025", extension="gsheet", size=0)
+        ]
+        backend.parse_monthly_budget_sheet.return_value = (
+            [{"date": "1/8/2025", "amount": 15000, "description": "Snacks", "category": "Food"}],
+            [],
+        )
+
+        ExpenseSheetService(self.user).sync_google_drive_documents(self.source)
+
+        manual_document.refresh_from_db()
+        self.assertEqual(manual_document.source_id, self.source.pk)
+        self.assertEqual(manual_document.google_sheet_id, "sheet123")
+        self.assertEqual(manual_document.google_sheet_name, "Monthly Budget Aug 2025")
+
+        manual_row.refresh_from_db()
+        self.assertEqual(manual_row.origin, Transaction.Origin.MANUAL)
+        self.assertEqual(
+            sorted(manual_document.transactions.values_list("origin", flat=True)),
+            [Transaction.Origin.GOOGLE_SHEETS, Transaction.Origin.MANUAL],
+        )
+
+    @patch("prospectus_lumos.apps.expenses.services.GoogleDriveBackend")
+    def test_sync_keeps_rows_imported_by_another_path(self, backend_cls: MagicMock) -> None:
+        upload_source = DocumentSource.objects.create(
+            user=self.user,
+            source_type=DocumentSource.SourceType.DIRECT_UPLOAD,
+            name="Statement upload",
+        )
+        document = resolve_monthly_document(user=self.user, year=2025, month=8, source=upload_source)
+        uploaded_row = Transaction.objects.create(
+            document=document,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            origin=Transaction.Origin.DIRECT_UPLOAD,
+            date="4/8/2025",
+            amount=Decimal("5000"),
+            description="Uploaded statement row",
+        )
+
+        backend = MagicMock()
+        backend_cls.return_value = backend
+        backend.list_monthly_budget_files.return_value = [
+            File(key="sheet123", name="Monthly Budget Aug 2025", extension="gsheet", size=0)
+        ]
+        backend.parse_monthly_budget_sheet.return_value = (
+            [{"date": "1/8/2025", "amount": 15000, "description": "Snacks", "category": "Food"}],
+            [],
+        )
+
+        ExpenseSheetService(self.user).sync_google_drive_documents(self.source)
+
+        self.assertTrue(Transaction.objects.filter(pk=uploaded_row.pk).exists())
+        document.refresh_from_db()
+        self.assertEqual(document.total_expenses, Decimal("20000"))
+        self.assertEqual(document.expenses_count, 2)
+
+    @patch("prospectus_lumos.apps.expenses.services.GoogleDriveBackend")
     def test_sync_skips_existing_same_sheet_id(self, backend_cls: MagicMock) -> None:
         backend = MagicMock()
         backend_cls.return_value = backend
@@ -151,6 +227,103 @@ class ExpenseSheetServiceSyncTests(TestCase):
         self.assertEqual(docs, [])
         existing.refresh_from_db()
         self.assertEqual(existing.google_sheet_id, "SAME")
+
+
+class ExpenseSheetServiceResyncTests(GoogleDriveSyncTestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self.document = resolve_monthly_document(user=self.user, year=2025, month=8, source=self.source)
+        self.document.google_sheet_id = "sheet123"
+        self.document.google_sheet_name = "Monthly Budget Aug 2025"
+        self.document.save(update_fields=["google_sheet_id", "google_sheet_name"])
+        self.imported_row = Transaction.objects.create(
+            document=self.document,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            origin=Transaction.Origin.GOOGLE_SHEETS,
+            date="1/8/2025",
+            amount=Decimal("15000"),
+            description="Snacks",
+            category="Food",
+        )
+        self.manual_row = Transaction.objects.create(
+            document=self.document,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            origin=Transaction.Origin.MANUAL,
+            date="3/8/2025",
+            amount=Decimal("2000"),
+            description="Manual coffee",
+        )
+        recalculate_document_summary(document=self.document)
+
+    def _stub_backend(self, backend_cls: MagicMock) -> MagicMock:
+        backend = MagicMock()
+        backend_cls.return_value = backend
+        backend.parse_monthly_budget_sheet.return_value = (
+            [{"date": "1/8/2025", "amount": 18000, "description": "Snacks", "category": "Food"}],
+            [{"date": "2/8/2025", "amount": 500000, "description": "Paycheck", "category": "Paycheck"}],
+        )
+        return backend
+
+    @patch("prospectus_lumos.apps.expenses.services.GoogleDriveBackend")
+    def test_resync_preserves_manual_rows_and_recombines_totals(self, backend_cls: MagicMock) -> None:
+        self._stub_backend(backend_cls)
+
+        ExpenseSheetService(self.user).resync_document(self.document)
+
+        self.assertTrue(Transaction.objects.filter(pk=self.manual_row.pk).exists())
+        self.assertFalse(Transaction.objects.filter(pk=self.imported_row.pk).exists())
+
+        self.document.refresh_from_db()
+        self.assertEqual(self.document.total_expenses, Decimal("20000"))
+        self.assertEqual(self.document.total_income, Decimal("500000"))
+        self.assertEqual(self.document.expenses_count, 2)
+        self.assertEqual(self.document.income_count, 1)
+
+    @patch("prospectus_lumos.apps.expenses.services.GoogleDriveBackend")
+    def test_repeated_resync_does_not_duplicate_imported_rows(self, backend_cls: MagicMock) -> None:
+        self._stub_backend(backend_cls)
+        service = ExpenseSheetService(self.user)
+
+        service.resync_document(self.document)
+        service.resync_document(self.document)
+
+        rows = self.document.transactions.all()
+        self.assertEqual(rows.filter(origin=Transaction.Origin.GOOGLE_SHEETS).count(), 2)
+        self.assertEqual(rows.filter(origin=Transaction.Origin.MANUAL).count(), 1)
+
+        self.document.refresh_from_db()
+        self.assertEqual(self.document.total_expenses, Decimal("20000"))
+        self.assertEqual(self.document.total_income, Decimal("500000"))
+
+    @patch("prospectus_lumos.apps.expenses.services.GoogleDriveBackend")
+    def test_a_failed_sheet_read_leaves_the_month_untouched(self, backend_cls: MagicMock) -> None:
+        backend = MagicMock()
+        backend_cls.return_value = backend
+        backend.parse_monthly_budget_sheet.side_effect = RuntimeError("sheet unavailable")
+
+        with self.assertRaises(RuntimeError):
+            ExpenseSheetService(self.user).resync_document(self.document)
+
+        self.assertEqual(
+            sorted(self.document.transactions.values_list("pk", flat=True)),
+            sorted([self.imported_row.pk, self.manual_row.pk]),
+        )
+        self.document.refresh_from_db()
+        self.assertEqual(self.document.total_expenses, Decimal("17000"))
+        self.assertEqual(self.document.expenses_count, 2)
+
+    def test_resync_requires_a_google_sheet_id(self) -> None:
+        self.document.google_sheet_id = ""
+        self.document.save(update_fields=["google_sheet_id"])
+
+        with self.assertRaises(ValueError):
+            ExpenseSheetService(self.user).resync_document(self.document)
+
+    def test_resync_rejects_a_month_that_is_not_google_backed(self) -> None:
+        manual_document = resolve_monthly_document(user=self.user, year=2025, month=7)
+
+        with self.assertRaises(ValueError):
+            ExpenseSheetService(self.user).resync_document(manual_document)
 
 
 class DocumentDetailViewTests(TestCase):
