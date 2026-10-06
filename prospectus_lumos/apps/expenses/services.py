@@ -5,12 +5,18 @@ from typing import List, Tuple, Dict, Any
 from decimal import Decimal
 
 from django.core.files.base import ContentFile
+from django.db import transaction as db_transaction
 from django.db.models import Sum
 from django.utils import timezone
 
 from libraries.google_cloud.backends import GoogleDriveBackend
 from prospectus_lumos.apps.accounts.models import DocumentSource
 from prospectus_lumos.apps.documents.models import Document
+from prospectus_lumos.apps.documents.services import (
+    lock_documents,
+    recalculate_document_summary,
+    resolve_monthly_document,
+)
 from prospectus_lumos.apps.transactions.models import Transaction
 
 
@@ -54,34 +60,18 @@ class ExpenseSheetService:
                 # Create CSV content
                 csv_content = self._create_csv_content(expenses, income)
 
-                # Calculate totals
-                total_expenses = sum(Decimal(str(exp["amount"])) for exp in expenses)
-                total_income = sum(Decimal(str(inc["amount"])) for inc in income)
-
-                # Create or update document
-                if existing_doc:
-                    document = existing_doc
-                    # Delete old transactions
-                    document.transactions.all().delete()
-                else:
-                    document = Document(user=self.user, source=source, month=month, year=year)
+                # Reuse the single document for this user and month, whatever created it
+                document = resolve_monthly_document(user=self.user, year=year, month=month, source=source)
 
                 # Update document fields
                 document.google_sheet_id = file.key
                 document.google_sheet_name = file.name
-                document.total_expenses = total_expenses
-                document.total_income = total_income
-                document.expenses_count = len(expenses)
-                document.income_count = len(income)
 
                 # Save CSV file
                 csv_filename = f"{self.user.username}_{year}_{month:02d}.csv"
                 document.csv_file.save(csv_filename, ContentFile(csv_content.encode("utf-8")), save=False)
 
-                document.save()
-
-                # Create transaction records
-                self._create_transaction_records(document, expenses, income)
+                self._replace_sheet_rows(document, expenses, income)
 
                 processed_documents.append(document)
 
@@ -210,6 +200,30 @@ class ExpenseSheetService:
         # Bulk create transactions
         Transaction.objects.bulk_create(transactions)
 
+    def _replace_sheet_rows(
+        self,
+        document: Document,
+        expenses: List[Dict[str, Any]],
+        income: List[Dict[str, Any]],
+    ) -> None:
+        """Replace a document's sheet rows and refresh its summary in one transaction.
+
+        Locks the month before touching it so a manual write cannot interleave with an import and
+        leave the stored totals disagreeing with the surviving rows. Only imported rows are
+        replaced; manually entered rows in the same month are kept and counted in the summary.
+
+        :param document: document to write, saved or not; pending field changes are saved here.
+        :param expenses: parsed expense rows from the sheet.
+        :param income: parsed income rows from the sheet.
+        """
+
+        with db_transaction.atomic():
+            document.save()
+            lock_documents(document)
+            document.transactions.exclude(origin=Transaction.Origin.MANUAL).delete()
+            self._create_transaction_records(document, expenses, income)
+            recalculate_document_summary(document=document)
+
     def resync_document(self, document: Document) -> Document:
         """Re-sync a single Google Drive-backed document.
 
@@ -232,22 +246,10 @@ class ExpenseSheetService:
         # Create CSV content
         csv_content = self._create_csv_content(expenses, income)
 
-        # Calculate totals
-        total_expenses = sum(Decimal(str(exp["amount"])) for exp in expenses)
-        total_income = sum(Decimal(str(inc["amount"])) for inc in income)
-
-        # Replace transactions and update document
-        document.transactions.all().delete()
-        document.total_expenses = total_expenses
-        document.total_income = total_income
-        document.expenses_count = len(expenses)
-        document.income_count = len(income)
-
         csv_filename = f"{document.user.username}_{document.year}_{document.month:02d}.csv"
         document.csv_file.save(csv_filename, ContentFile(csv_content.encode("utf-8")), save=False)
-        document.save()
 
-        self._create_transaction_records(document, expenses, income)
+        self._replace_sheet_rows(document, expenses, income)
 
         # Update last sync for the source for auditing
         source.last_sync = timezone.now()
