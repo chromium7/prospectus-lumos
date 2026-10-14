@@ -5,7 +5,9 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
+from prospectus_lumos.apps.documents.models import Document
 from prospectus_lumos.apps.transactions.models import Transaction
+from prospectus_lumos.website.app.forms import TransactionForm
 
 
 class TransactionCreatePageTests(TestCase):
@@ -100,13 +102,49 @@ class TransactionCreatePageTests(TestCase):
         self.assertRedirects(response, "/app/?month=2026-09", fetch_redirect_response=False)
         saved = Transaction.objects.get()
         self.assertEqual(saved.user, self.user)
-        self.assertIsNone(saved.document)
+        self.assertIsNotNone(saved.document)
         self.assertEqual(saved.origin, Transaction.Origin.MANUAL)
         self.assertEqual(saved.amount, Decimal("125000.00"))
         self.assertEqual(saved.category, "Groceries")
         self.assertEqual(saved.date, "2026-09-30")
 
+        document = Document.objects.get(user=self.user, year=2026, month=9)
+        self.assertEqual(saved.document, document)
+        self.assertEqual(document.total_expenses, Decimal("125000.00"))
+        self.assertEqual(document.expenses_count, 1)
+
         self.assertEqual(Transaction.objects.count(), 1)
+
+    def test_form_validates_amount_date_description_and_category(self) -> None:
+        valid = {
+            "transaction_type": Transaction.TransactionType.EXPENSE,
+            "amount": "125000.50",
+            "category": "Food",
+            "date": "2026-09-30",
+            "description": "Weekly groceries",
+        }
+        invalid_values = (
+            ("amount", "0"),
+            ("amount", "-1"),
+            ("amount", "1.001"),
+            ("amount", "10000000000000.00"),
+            ("amount", "NaN"),
+            ("date", "not-a-date"),
+            ("description", "   "),
+            ("description", "x" * 501),
+            ("description", "invalid\x00description"),
+            ("category", "   "),
+            ("category", "x" * 101),
+            ("category", "invalid\x00category"),
+        )
+
+        for field, value in invalid_values:
+            with self.subTest(field=field, value=value):
+                form = TransactionForm(data={**valid, field: value}, user=self.user)
+                self.assertFalse(form.is_valid())
+                self.assertIn(field, form.errors)
+
+        self.assertFalse(Transaction.objects.exists())
 
     def test_transfer_type_is_not_accepted(self) -> None:
         self.client.force_login(self.user)
