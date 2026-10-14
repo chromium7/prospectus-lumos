@@ -63,7 +63,10 @@ class ExpenseSheetService:
                 # Reuse the single document for this user and month, whatever created it
                 document = resolve_monthly_document(user=self.user, year=year, month=month, source=source)
 
-                # Update document fields
+                # Record the importing Google source on a month this sync adopted, so a month
+                # first created by manual entry carries real provider metadata and can be
+                # re-synced on its own afterwards. Existing row origins are left untouched.
+                document.source = source
                 document.google_sheet_id = file.key
                 document.google_sheet_name = file.name
 
@@ -209,8 +212,10 @@ class ExpenseSheetService:
         """Replace a document's sheet rows and refresh its summary in one transaction.
 
         Locks the month before touching it so a manual write cannot interleave with an import and
-        leave the stored totals disagreeing with the surviving rows. Only imported rows are
-        replaced; manually entered rows in the same month are kept and counted in the summary.
+        leave the stored totals disagreeing with the surviving rows. Only rows this importer owns
+        — the ones carrying the Google Sheets origin — are replaced, so repeated imports cannot
+        duplicate sheet rows while manually entered rows and rows imported by other paths survive
+        and are counted in the refreshed summary.
 
         :param document: document to write, saved or not; pending field changes are saved here.
         :param expenses: parsed expense rows from the sheet.
@@ -220,15 +225,22 @@ class ExpenseSheetService:
         with db_transaction.atomic():
             document.save()
             lock_documents(document)
-            document.transactions.exclude(origin=Transaction.Origin.MANUAL).delete()
+            document.transactions.filter(origin=Transaction.Origin.GOOGLE_SHEETS).delete()
             self._create_transaction_records(document, expenses, income)
             recalculate_document_summary(document=document)
 
     def resync_document(self, document: Document) -> Document:
         """Re-sync a single Google Drive-backed document.
 
-        Re-parses the Google Sheet, re-generates the CSV, updates totals/counters,
-        and replaces transactions to avoid duplicates.
+        Re-parses the Google Sheet, re-generates the CSV, and replaces only the rows this
+        importer owns, so repeated re-syncs neither duplicate sheet rows nor drop manual rows
+        entered in the same month. Totals and counts are recalculated from everything that
+        survives.
+
+        :param document: saved monthly document backed by a Google Sheet.
+        :return: the same instance, with refreshed import artifacts and summary.
+        :raises ValueError: if the document's source is not Google Drive with valid credentials,
+            or the document has no Google Sheet to re-read.
         """
         source = document.source
         if source.source_type != "google_drive" or not source.google_credentials:
