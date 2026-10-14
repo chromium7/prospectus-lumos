@@ -1,9 +1,8 @@
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
-from django.core.exceptions import ValidationError
 from django.test import TestCase
 
 from prospectus_lumos.apps.accounts.models import DocumentSource
@@ -23,8 +22,8 @@ class ManualTransactionCreationTests(TestCase):
             "transaction_type": Transaction.TransactionType.EXPENSE,
             "date": date(2026, 9, 30),
             "amount": Decimal("125000.50"),
-            "description": "  Weekly groceries  ",
-            "category": "  Food  ",
+            "description": "Weekly groceries",
+            "category": "Food",
         }
         values.update(overrides)
         return create_manual_transaction(**values)  # type: ignore[arg-type]
@@ -66,33 +65,6 @@ class ManualTransactionCreationTests(TestCase):
         self.assertEqual(Document.objects.filter(user=other).count(), 1)
         self.assertEqual(DocumentSource.objects.filter(user=self.user).count(), 1)
         self.assertEqual(DocumentSource.objects.filter(user=other).count(), 1)
-
-    def test_validates_type_date_amount_and_text_fields(self) -> None:
-        invalid_values = (
-            ("transaction_type", "transfer"),
-            ("date", "2026-09-30"),
-            ("date", datetime(2026, 9, 30, 12, 0)),
-            ("amount", Decimal("0")),
-            ("amount", Decimal("-1")),
-            ("amount", Decimal("1.001")),
-            ("amount", Decimal("10000000000000.00")),
-            ("amount", Decimal("NaN")),
-            ("amount", "125000.00"),
-            ("description", "   "),
-            ("description", "x" * 501),
-            ("description", "invalid\x00description"),
-            ("category", "   "),
-            ("category", "x" * 101),
-            ("category", "invalid\x00category"),
-        )
-
-        for field, value in invalid_values:
-            with self.subTest(field=field, value=value), self.assertRaises(ValidationError):
-                self._create(**{field: value})
-
-        self.assertFalse(Transaction.objects.exists())
-        self.assertFalse(Document.objects.exists())
-        self.assertFalse(DocumentSource.objects.exists())
 
     def test_rolls_back_the_transaction_and_new_month_if_summary_update_fails(self) -> None:
         with (

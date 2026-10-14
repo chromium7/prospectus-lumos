@@ -11,11 +11,10 @@ from django.core.validators import DecimalValidator, ProhibitNullCharactersValid
 _NULL_CHARACTER_VALIDATOR = ProhibitNullCharactersValidator()
 
 
-def validate_choice(*, value: str, field: str, choices: Collection[str], message: str) -> str:
+def validate_choice(*, value: str, choices: Collection[str], message: str) -> str:
     """Return a value when it belongs to the supplied choices.
 
     :param value: submitted choice value.
-    :param field: field name used in the validation error.
     :param choices: accepted values.
     :param message: user-safe invalid-choice message.
     :return: the validated choice.
@@ -23,28 +22,26 @@ def validate_choice(*, value: str, field: str, choices: Collection[str], message
     """
 
     if value not in choices:
-        raise ValidationError({field: ValidationError(message, code="invalid_choice")})
+        raise ValidationError(message, code="invalid_choice")
     return value
 
 
-def validate_date_only(*, value: date_type, field: str) -> date_type:
+def validate_date_only(value: date_type) -> date_type:
     """Return a calendar date while rejecting strings and datetimes.
 
     :param value: submitted date-only value.
-    :param field: field name used in the validation error.
     :return: the validated calendar date.
     :raises ValidationError: if the value is not exactly a date.
     """
 
     if not isinstance(value, date_type) or type(value) is not date_type:
-        raise ValidationError({field: ValidationError("Enter a valid local date.", code="invalid")})
+        raise ValidationError("Enter a valid local date.", code="invalid")
     return value
 
 
 def validate_positive_decimal(
     *,
     value: Decimal,
-    field: str,
     max_digits: int,
     decimal_places: int,
     label: str,
@@ -52,7 +49,6 @@ def validate_positive_decimal(
     """Return a positive, finite Decimal within the supplied precision.
 
     :param value: submitted Decimal value.
-    :param field: field name used in the validation error.
     :param max_digits: maximum total digits allowed.
     :param decimal_places: maximum fractional digits allowed.
     :param label: user-facing value label for validation messages.
@@ -61,45 +57,35 @@ def validate_positive_decimal(
     """
 
     if not isinstance(value, Decimal) or not value.is_finite():
-        raise ValidationError({field: ValidationError(f"Enter a valid {label}.", code="invalid")})
+        raise ValidationError(f"Enter a valid {label}.", code="invalid")
     if value <= 0:
-        raise ValidationError({field: ValidationError("Enter an amount greater than zero.", code="non_positive")})
+        raise ValidationError("Enter an amount greater than zero.", code="non_positive")
     try:
         DecimalValidator(max_digits=max_digits, decimal_places=decimal_places)(value)
     except InvalidOperation:
-        raise ValidationError({field: ValidationError(f"Enter a valid {label}.", code="invalid")})
-    except ValidationError as error:
-        raise ValidationError({field: error.error_list})
+        raise ValidationError(f"Enter a valid {label}.", code="invalid")
     return value
 
 
-def validate_required_text(*, value: str, field: str, max_length: int) -> str:
+def validate_required_text(*, value: str, max_length: int) -> str:
     """Strip and validate a required bounded text value.
 
     :param value: submitted text value.
-    :param field: field name used in the validation error.
     :param max_length: maximum length after surrounding whitespace is stripped.
     :return: the stripped text.
     :raises ValidationError: if the value is not text, blank, too long, or contains a null character.
     """
 
     if not isinstance(value, str):
-        raise ValidationError({field: ValidationError("Enter a valid text value.", code="invalid")})
+        raise ValidationError("Enter a valid text value.", code="invalid")
     cleaned = value.strip()
     if not cleaned:
-        raise ValidationError({field: ValidationError("This field is required.", code="required")})
+        raise ValidationError("This field is required.", code="required")
     if len(cleaned) > max_length:
         raise ValidationError(
-            {
-                field: ValidationError(
-                    f"Ensure this value has at most {max_length} characters.",
-                    code="max_length",
-                    params={"limit_value": max_length, "show_value": len(cleaned), "value": cleaned},
-                )
-            }
+            f"Ensure this value has at most {max_length} characters.",
+            code="max_length",
+            params={"limit_value": max_length, "show_value": len(cleaned), "value": cleaned},
         )
-    try:
-        _NULL_CHARACTER_VALIDATOR(cleaned)
-    except ValidationError as error:
-        raise ValidationError({field: error.error_list})
+    _NULL_CHARACTER_VALIDATOR(cleaned)
     return cleaned
