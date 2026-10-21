@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 from decimal import Decimal
+from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch, MagicMock
 
@@ -491,6 +492,31 @@ class ExpenseAnalyzerServiceExcludeTests(TestCase):
             ],
         )
 
+        year_analysis = ExpenseAnalyzerService(self.user).get_expense_analysis(
+            year=2025,
+            exclude_categories=["Transport"],
+        )
+        self.assertEqual(year_analysis["yearly_category_chart"]["years"], [2025])
+        self.assertEqual(
+            year_analysis["yearly_category_chart"]["datasets"],
+            [{"label": "Food", "data": [12000.0]}],
+        )
+
+        july_document = Document.objects.create(user=self.user, source=self.source, month=7, year=2024)
+        Transaction.objects.create(
+            document=july_document,
+            transaction_type="expense",
+            amount=9000,
+            description="Rent",
+            category="Housing",
+        )
+        month_analysis = ExpenseAnalyzerService(self.user).get_expense_analysis(month=7)
+        self.assertEqual(month_analysis["yearly_category_chart"]["years"], [2024])
+        self.assertEqual(
+            month_analysis["yearly_category_chart"]["datasets"],
+            [{"label": "Housing", "data": [9000.0]}],
+        )
+
 
 class AnalyzerViewExcludeTests(TestCase):
     def setUp(self) -> None:
@@ -570,3 +596,9 @@ class AnalyzerViewExcludeTests(TestCase):
         self.assertContains(response, 'id="expenseCategoryYearChart"')
         self.assertContains(response, 'id="annual-category-filter"')
         self.assertContains(response, "expense-category-year-chart.js")
+
+    def test_annual_category_chart_initializes_filters_and_unique_colors(self) -> None:
+        script = Path("static_files/js/expense-category-year-chart.js").read_text(encoding="utf-8")
+
+        self.assertIn("var hue = (index * 137.508) % 360;", script)
+        self.assertTrue(script.rstrip().endswith("updateChart();\n})();"))

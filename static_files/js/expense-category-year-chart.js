@@ -20,10 +20,10 @@
     return;
   }
 
-  var colors = [
-    '#ef4444', '#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#ec4899',
-    '#06b6d4', '#84cc16', '#f97316', '#6366f1', '#14b8a6', '#a855f7'
-  ];
+  function categoryColor(index) {
+    var hue = (index * 137.508) % 360;
+    return 'hsl(' + hue.toFixed(1) + ', 68%, 55%)';
+  }
   var currency = new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
@@ -40,7 +40,7 @@
     return {
       label: dataset.label,
       data: (dataset.data || []).map(Number),
-      backgroundColor: colors[index % colors.length],
+      backgroundColor: categoryColor(index),
       borderWidth: 1
     };
   });
@@ -127,4 +127,6 @@
       setAllCategories(false);
     });
   }
+
+  updateChart();
 })();
