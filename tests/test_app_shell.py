@@ -47,7 +47,21 @@ class AppShellTests(TestCase):
         self.assertContains(response, 'name="month" type="month" value="2026-09"')
         self.assertContains(response, "Start with an account")
         self.assertNotContains(response, "dashboard.js")
-        self.assertContains(response, 'href="/app/transactions/new"')
+        self.assertContains(
+            response,
+            'href="/app/transactions/new?next=/app/%3Fmonth%3D2026-09"',
+            count=2,
+        )
+
+    def test_shared_shell_guards_unsaved_forms_and_offline_posts(self) -> None:
+        script = Path("static_files/js/app-shell.js").read_text(encoding="utf-8")
+
+        self.assertIn('querySelectorAll("[data-confirm-leave]")', script)
+        self.assertIn('form.hasAttribute("data-dirty")', script)
+        self.assertIn("markFormDirty(form)", script)
+        self.assertIn('window.addEventListener("beforeunload"', script)
+        self.assertIn('form.hasAttribute("data-requires-connection")', script)
+        self.assertIn("event.preventDefault()", script)
 
     def test_dashboard_values_are_rendered_from_template_context(self) -> None:
         content = render_to_string(

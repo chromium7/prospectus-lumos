@@ -1,7 +1,9 @@
 from decimal import Decimal
 from typing import Any
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.db import IntegrityError, OperationalError
 from django.test import TestCase
 from django.urls import reverse
 
@@ -38,6 +40,16 @@ class TransactionCreatePageTests(TestCase):
         self.assertNotContains(response, "Financial account")
         self.assertNotContains(response, "submission_token")
         self.assertNotContains(response, "transaction-form.js")
+        self.assertContains(response, "data-confirm-leave")
+        self.assertContains(response, "data-requires-connection")
+        self.assertContains(response, 'data-loading-text="Saving transaction…"')
+        self.assertNotContains(response, "data-loading-message")
+        self.assertNotContains(response, "data-dirty")
+        self.assertContains(response, "Unsaved changes.")
+        self.assertLess(
+            response.content.index(b'id="id_amount"'),
+            response.content.index(b'name="transaction_type"'),
+        )
 
     def test_recent_category_suggestions_are_user_scoped(self) -> None:
         Transaction.objects.create(
@@ -83,6 +95,7 @@ class TransactionCreatePageTests(TestCase):
         self.assertContains(response, "Choose or enter a category.", status_code=400)
         self.assertContains(response, 'value="125000.50"', status_code=400)
         self.assertContains(response, 'value="Weekly groceries"', status_code=400)
+        self.assertContains(response, "data-dirty", status_code=400)
         self.assertFalse(Transaction.objects.exists())
 
     def test_post_saves_direct_transaction(self) -> None:
@@ -114,6 +127,63 @@ class TransactionCreatePageTests(TestCase):
         self.assertEqual(document.expenses_count, 1)
 
         self.assertEqual(Transaction.objects.count(), 1)
+
+    @patch(
+        "prospectus_lumos.website.app.forms.create_manual_transaction",
+        side_effect=OperationalError("database unavailable"),
+    )
+    @patch(
+        "prospectus_lumos.website.app.views.recent_transaction_categories",
+        side_effect=OperationalError("database unavailable"),
+    )
+    def test_save_failure_preserves_values_without_querying_suggestions(
+        self,
+        recent_categories: Any,
+        _create: Any,
+    ) -> None:
+        self.client.force_login(self.user)
+
+        with self.assertLogs("prospectus_lumos.website.app.views", level="ERROR") as logs:
+            response = self.client.post(
+                self.url,
+                {
+                    "transaction_type": Transaction.TransactionType.EXPENSE,
+                    "amount": "125000",
+                    "category": "Groceries",
+                    "date": "2026-09-30",
+                    "description": "Weekly groceries",
+                    "save_action": "save",
+                },
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertContains(response, "couldn&#x27;t save this transaction", status_code=503)
+        self.assertContains(response, 'value="125000"', status_code=503)
+        self.assertContains(response, 'value="Weekly groceries"', status_code=503)
+        self.assertContains(response, "data-dirty", status_code=503)
+        self.assertIn("Manual transaction save failed", logs.output[0])
+        recent_categories.assert_not_called()
+        self.assertFalse(Transaction.objects.exists())
+
+    @patch(
+        "prospectus_lumos.website.app.forms.create_manual_transaction",
+        side_effect=IntegrityError("invalid transaction"),
+    )
+    def test_data_integrity_errors_are_not_presented_as_retryable_outages(self, _create: Any) -> None:
+        self.client.force_login(self.user)
+
+        with self.assertRaises(IntegrityError):
+            self.client.post(
+                self.url,
+                {
+                    "transaction_type": Transaction.TransactionType.EXPENSE,
+                    "amount": "125000",
+                    "category": "Groceries",
+                    "date": "2026-09-30",
+                    "description": "Weekly groceries",
+                    "save_action": "save",
+                },
+            )
 
     def test_form_validates_amount_date_description_and_category(self) -> None:
         valid = {
@@ -185,3 +255,23 @@ class TransactionCreatePageTests(TestCase):
         fallback = self.client.post(self.url, payload)
 
         self.assertRedirects(fallback, reverse("app:home"), fetch_redirect_response=False)
+
+    def test_save_another_preserves_a_safe_return_destination(self) -> None:
+        self.client.force_login(self.user)
+        return_url = f'{reverse("app:home")}?month=2026-10'
+
+        response = self.client.post(
+            self.url,
+            {
+                "transaction_type": Transaction.TransactionType.INCOME,
+                "amount": "7500000",
+                "category": "Salary",
+                "date": "2026-10-01",
+                "description": "Monthly salary",
+                "next": return_url,
+                "save_action": "save_another",
+            },
+        )
+
+        expected = f"{self.url}?next=%2Fapp%2F%3Fmonth%3D2026-10"
+        self.assertRedirects(response, expected, fetch_redirect_response=False)

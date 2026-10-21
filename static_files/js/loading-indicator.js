@@ -13,6 +13,7 @@
 
   document.addEventListener('submit', function(e) {
     var form = e.target;
+    if (e.defaultPrevented) return;
     if (!form.dataset.loading) return;
     showLoading(form.dataset.loadingText || null);
   });
