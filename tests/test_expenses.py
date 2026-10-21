@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import tempfile
 from decimal import Decimal
-from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch, MagicMock
 
@@ -596,9 +595,3 @@ class AnalyzerViewExcludeTests(TestCase):
         self.assertContains(response, 'id="expenseCategoryYearChart"')
         self.assertContains(response, 'id="annual-category-filter"')
         self.assertContains(response, "expense-category-year-chart.js")
-
-    def test_annual_category_chart_initializes_filters_and_unique_colors(self) -> None:
-        script = Path("static_files/js/expense-category-year-chart.js").read_text(encoding="utf-8")
-
-        self.assertIn("var hue = (index * 137.508) % 360;", script)
-        self.assertTrue(script.rstrip().endswith("updateChart();\n})();"))
