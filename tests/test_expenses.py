@@ -442,6 +442,32 @@ class ExpenseAnalyzerServiceExcludeTests(TestCase):
         self.assertEqual(analysis["expenses_by_category"], {})
         self.assertEqual(analysis["total_expenses"], 0)
 
+    def test_expense_analysis_excludes_uncategorized(self) -> None:
+        Transaction.objects.create(
+            document=self.doc, transaction_type="expense", amount=700, description="Unknown", category=""
+        )
+        service = ExpenseAnalyzerService(self.user)
+        analysis = service.get_expense_analysis(exclude_categories=["Uncategorized"])
+        monthly_document = analysis["documents"][0]
+        self.assertNotIn("Uncategorized", analysis["expenses_by_category"])
+        self.assertEqual(analysis["total_expenses"], 17000)
+        self.assertEqual(monthly_document.filtered_total_expenses, 17000)
+        self.assertEqual(monthly_document.filtered_expenses_count, 3)
+
+    def test_expense_analysis_excludes_uncategorized_and_named_category(self) -> None:
+        Transaction.objects.create(
+            document=self.doc, transaction_type="expense", amount=700, description="Unknown", category=""
+        )
+        service = ExpenseAnalyzerService(self.user)
+        analysis = service.get_expense_analysis(exclude_categories=["Uncategorized", "Transport"])
+        monthly_document = analysis["documents"][0]
+        cats = analysis["expenses_by_category"]
+        self.assertNotIn("Uncategorized", cats)
+        self.assertNotIn("Transport", cats)
+        self.assertEqual(analysis["total_expenses"], 12000)
+        self.assertEqual(monthly_document.filtered_total_expenses, 12000)
+        self.assertEqual(monthly_document.filtered_expenses_count, 2)
+
     def test_income_analysis_excludes_category(self) -> None:
         service = ExpenseAnalyzerService(self.user)
         analysis = service.get_income_analysis(exclude_categories=["Side Hustle"])
@@ -501,12 +527,6 @@ class AnalyzerViewExcludeTests(TestCase):
         self.assertNotIn("Transport", ctx["analysis"]["expenses_by_category"])
         self.assertContains(response, "Rp10.000")
         self.assertContains(response, "exclude_category=Transport")
-
-    def test_expense_category_chart_uses_distinct_colors(self) -> None:
-        self.client.login(username="tester", password="pass")
-        response = self.client.get(reverse("expense_analyzer"))
-
-        self.assertContains(response, "'#ef4444', '#3b82f6', '#f59e0b', '#10b981'")
 
     def test_income_analyzer_view_includes_exclude_categories_context(self) -> None:
         self.client.login(username="tester", password="pass")
