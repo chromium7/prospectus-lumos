@@ -206,13 +206,13 @@
                             <tbody>
                                 {% for doc in analysis.documents %}
                                     {% if forloop.counter <= 5 %}
-                                    <tr onclick="location.href='{% url 'expense_analyzer' %}?year={{ doc.year }}&month={{ doc.month }}'" style="cursor: pointer;">
+                                    <tr onclick="location.href='{% url 'expense_analyzer' %}?year={{ doc.year }}&month={{ doc.month }}{% for category in exclude_categories %}&exclude_category={{ category|urlencode }}{% endfor %}'" style="cursor: pointer;">
                                         <td>{{ doc.month_name }} {{ doc.year }}</td>
                                         <td class="text-end text-danger">
-                                            <strong>{{ doc.total_expenses|idr }}</strong>
+                                            <strong>{{ doc.filtered_total_expenses|idr }}</strong>
                                         </td>
                                         <td class="text-end">
-                                            <span class="badge bg-danger">{{ doc.expenses_count }}</span>
+                                            <span class="badge bg-danger">{{ doc.filtered_expenses_count }}</span>
                                         </td>
                                     </tr>
                                     {% endif %}
@@ -221,13 +221,13 @@
                             <tbody id="expense-month-collapse" class="collapse">
                                 {% for doc in analysis.documents %}
                                     {% if forloop.counter > 5 %}
-                                    <tr onclick="location.href='{% url 'expense_analyzer' %}?year={{ doc.year }}&month={{ doc.month }}'" style="cursor: pointer;">
+                                    <tr onclick="location.href='{% url 'expense_analyzer' %}?year={{ doc.year }}&month={{ doc.month }}{% for category in exclude_categories %}&exclude_category={{ category|urlencode }}{% endfor %}'" style="cursor: pointer;">
                                         <td>{{ doc.month_name }} {{ doc.year }}</td>
                                         <td class="text-end text-danger">
-                                            <strong>{{ doc.total_expenses|idr }}</strong>
+                                            <strong>{{ doc.filtered_total_expenses|idr }}</strong>
                                         </td>
                                         <td class="text-end">
-                                            <span class="badge bg-danger">{{ doc.expenses_count }}</span>
+                                            <span class="badge bg-danger">{{ doc.filtered_expenses_count }}</span>
                                         </td>
                                     </tr>
                                     {% endif %}
@@ -349,7 +349,7 @@
       ];
       var tvalues = [
         {% for doc in analysis.documents reversed %}
-          {{ doc.total_expenses }}{% if not forloop.last %},{% endif %}
+          {{ doc.filtered_total_expenses }}{% if not forloop.last %},{% endif %}
         {% endfor %}
       ];
       new Chart(tctx, {
@@ -378,7 +378,7 @@
       {% endfor %}
     ];
     var colors = [
-      '#ef4444', '#dc2626', '#f87171', '#fb7185', '#fca5a5', '#fecaca', '#f43f5e', '#e11d48', '#b91c1c', '#be123c'
+      '#ef4444', '#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#06b6d4', '#f97316', '#ec4899', '#84cc16', '#6366f1'
     ];
     new Chart(ctx, {
       type: 'pie',

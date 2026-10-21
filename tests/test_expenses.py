@@ -428,10 +428,13 @@ class ExpenseAnalyzerServiceExcludeTests(TestCase):
         service = ExpenseAnalyzerService(self.user)
         analysis = service.get_expense_analysis(exclude_categories=["Transport"])
         cats = analysis["expenses_by_category"]
+        monthly_document = analysis["documents"][0]
         self.assertNotIn("Transport", cats)
         self.assertIn("Food", cats)
         # Total should exclude Transport
         self.assertEqual(analysis["total_expenses"], 12000)  # 10000 + 2000
+        self.assertEqual(monthly_document.filtered_total_expenses, 12000)
+        self.assertEqual(monthly_document.filtered_expenses_count, 2)
 
     def test_expense_analysis_excludes_multiple_categories(self) -> None:
         service = ExpenseAnalyzerService(self.user)
@@ -496,6 +499,14 @@ class AnalyzerViewExcludeTests(TestCase):
         ctx = response.context
         self.assertIn("Transport", ctx["exclude_categories"])
         self.assertNotIn("Transport", ctx["analysis"]["expenses_by_category"])
+        self.assertContains(response, "Rp10.000")
+        self.assertContains(response, "exclude_category=Transport")
+
+    def test_expense_category_chart_uses_distinct_colors(self) -> None:
+        self.client.login(username="tester", password="pass")
+        response = self.client.get(reverse("expense_analyzer"))
+
+        self.assertContains(response, "'#ef4444', '#3b82f6', '#f59e0b', '#10b981'")
 
     def test_income_analyzer_view_includes_exclude_categories_context(self) -> None:
         self.client.login(username="tester", password="pass")
