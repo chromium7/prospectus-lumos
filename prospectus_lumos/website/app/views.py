@@ -1,9 +1,10 @@
+import logging
 import re
 from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db import DatabaseError
+from django.db import InterfaceError, OperationalError
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -15,6 +16,8 @@ from prospectus_lumos.core.utils import TypedHttpRequest, safe_return_url
 from .forms import TransactionForm
 from .utils import recent_transaction_categories
 
+
+logger = logging.getLogger(__name__)
 
 MONTH_PATTERN = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
@@ -57,7 +60,8 @@ def transaction_create_view(request: TypedHttpRequest) -> HttpResponse:
         if form.is_valid():
             try:
                 saved = form.save()
-            except DatabaseError:
+            except (InterfaceError, OperationalError):
+                logger.exception("Manual transaction save failed for user %s", request.user.pk)
                 request_failed = True
                 form.add_error(
                     None,
@@ -80,13 +84,14 @@ def transaction_create_view(request: TypedHttpRequest) -> HttpResponse:
             },
         )
 
+    recent_categories = [] if request_failed else recent_transaction_categories(request.user)
     return render(
         request,
         "app/transaction_form.html",
         {
             "form": form,
             "next": return_url,
-            "recent_categories": recent_transaction_categories(request.user),
+            "recent_categories": recent_categories,
             "selected_tab": "app_activity",
         },
         status=503 if request_failed else 400 if request.method == "POST" else 200,

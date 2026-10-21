@@ -3,7 +3,7 @@ from typing import Any
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
-from django.db import DatabaseError
+from django.db import IntegrityError, OperationalError
 from django.test import TestCase
 from django.urls import reverse
 
@@ -42,6 +42,9 @@ class TransactionCreatePageTests(TestCase):
         self.assertNotContains(response, "transaction-form.js")
         self.assertContains(response, "data-confirm-leave")
         self.assertContains(response, "data-requires-connection")
+        self.assertContains(response, 'data-loading-text="Saving transaction…"')
+        self.assertNotContains(response, "data-loading-message")
+        self.assertNotContains(response, "data-dirty")
         self.assertContains(response, "Unsaved changes.")
         self.assertLess(
             response.content.index(b'id="id_amount"'),
@@ -92,6 +95,7 @@ class TransactionCreatePageTests(TestCase):
         self.assertContains(response, "Choose or enter a category.", status_code=400)
         self.assertContains(response, 'value="125000.50"', status_code=400)
         self.assertContains(response, 'value="Weekly groceries"', status_code=400)
+        self.assertContains(response, "data-dirty", status_code=400)
         self.assertFalse(Transaction.objects.exists())
 
     def test_post_saves_direct_transaction(self) -> None:
@@ -126,28 +130,60 @@ class TransactionCreatePageTests(TestCase):
 
     @patch(
         "prospectus_lumos.website.app.forms.create_manual_transaction",
-        side_effect=DatabaseError("database unavailable"),
+        side_effect=OperationalError("database unavailable"),
     )
-    def test_save_failure_preserves_values_and_offers_retry(self, _create: Any) -> None:
+    @patch(
+        "prospectus_lumos.website.app.views.recent_transaction_categories",
+        side_effect=OperationalError("database unavailable"),
+    )
+    def test_save_failure_preserves_values_without_querying_suggestions(
+        self,
+        recent_categories: Any,
+        _create: Any,
+    ) -> None:
         self.client.force_login(self.user)
 
-        response = self.client.post(
-            self.url,
-            {
-                "transaction_type": Transaction.TransactionType.EXPENSE,
-                "amount": "125000",
-                "category": "Groceries",
-                "date": "2026-09-30",
-                "description": "Weekly groceries",
-                "save_action": "save",
-            },
-        )
+        with self.assertLogs("prospectus_lumos.website.app.views", level="ERROR") as logs:
+            response = self.client.post(
+                self.url,
+                {
+                    "transaction_type": Transaction.TransactionType.EXPENSE,
+                    "amount": "125000",
+                    "category": "Groceries",
+                    "date": "2026-09-30",
+                    "description": "Weekly groceries",
+                    "save_action": "save",
+                },
+            )
 
         self.assertEqual(response.status_code, 503)
         self.assertContains(response, "couldn&#x27;t save this transaction", status_code=503)
         self.assertContains(response, 'value="125000"', status_code=503)
         self.assertContains(response, 'value="Weekly groceries"', status_code=503)
+        self.assertContains(response, "data-dirty", status_code=503)
+        self.assertIn("Manual transaction save failed", logs.output[0])
+        recent_categories.assert_not_called()
         self.assertFalse(Transaction.objects.exists())
+
+    @patch(
+        "prospectus_lumos.website.app.forms.create_manual_transaction",
+        side_effect=IntegrityError("invalid transaction"),
+    )
+    def test_data_integrity_errors_are_not_presented_as_retryable_outages(self, _create: Any) -> None:
+        self.client.force_login(self.user)
+
+        with self.assertRaises(IntegrityError):
+            self.client.post(
+                self.url,
+                {
+                    "transaction_type": Transaction.TransactionType.EXPENSE,
+                    "amount": "125000",
+                    "category": "Groceries",
+                    "date": "2026-09-30",
+                    "description": "Weekly groceries",
+                    "save_action": "save",
+                },
+            )
 
     def test_form_validates_amount_date_description_and_category(self) -> None:
         valid = {

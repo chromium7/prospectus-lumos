@@ -21,15 +21,22 @@
 
   /**
    * Marks a guarded form as changed and exposes its visible save state.
-   * @param {Event} event
+   * @param {HTMLFormElement} form
    */
-  function markFormDirty(event) {
-    const form = event.currentTarget;
+  function markFormDirty(form) {
     dirtyForms.add(form);
     const message = form.querySelector("[data-unsaved-message]");
     if (message) {
       message.hidden = false;
     }
+  }
+
+  /**
+   * Marks a guarded form dirty after a user edit.
+   * @param {Event} event
+   */
+  function handleFormChange(event) {
+    markFormDirty(event.currentTarget);
   }
 
   /**
@@ -65,8 +72,11 @@
   }
 
   guardedForms.forEach((form) => {
-    form.addEventListener("input", markFormDirty);
-    form.addEventListener("change", markFormDirty);
+    if (form.hasAttribute("data-dirty")) {
+      markFormDirty(form);
+    }
+    form.addEventListener("input", handleFormChange);
+    form.addEventListener("change", handleFormChange);
     form.addEventListener("submit", handleFormSubmit);
   });
 

@@ -57,6 +57,8 @@ class AppShellTests(TestCase):
         script = Path("static_files/js/app-shell.js").read_text(encoding="utf-8")
 
         self.assertIn('querySelectorAll("[data-confirm-leave]")', script)
+        self.assertIn('form.hasAttribute("data-dirty")', script)
+        self.assertIn("markFormDirty(form)", script)
         self.assertIn('window.addEventListener("beforeunload"', script)
         self.assertIn('form.hasAttribute("data-requires-connection")', script)
         self.assertIn("event.preventDefault()", script)
