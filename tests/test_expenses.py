@@ -428,16 +428,45 @@ class ExpenseAnalyzerServiceExcludeTests(TestCase):
         service = ExpenseAnalyzerService(self.user)
         analysis = service.get_expense_analysis(exclude_categories=["Transport"])
         cats = analysis["expenses_by_category"]
+        monthly_document = analysis["documents"][0]
         self.assertNotIn("Transport", cats)
         self.assertIn("Food", cats)
         # Total should exclude Transport
         self.assertEqual(analysis["total_expenses"], 12000)  # 10000 + 2000
+        self.assertEqual(monthly_document.filtered_total_expenses, 12000)
+        self.assertEqual(monthly_document.filtered_expenses_count, 2)
 
     def test_expense_analysis_excludes_multiple_categories(self) -> None:
         service = ExpenseAnalyzerService(self.user)
         analysis = service.get_expense_analysis(exclude_categories=["Food", "Transport"])
         self.assertEqual(analysis["expenses_by_category"], {})
         self.assertEqual(analysis["total_expenses"], 0)
+
+    def test_expense_analysis_excludes_uncategorized(self) -> None:
+        Transaction.objects.create(
+            document=self.doc, transaction_type="expense", amount=700, description="Unknown", category=""
+        )
+        service = ExpenseAnalyzerService(self.user)
+        analysis = service.get_expense_analysis(exclude_categories=["Uncategorized"])
+        monthly_document = analysis["documents"][0]
+        self.assertNotIn("Uncategorized", analysis["expenses_by_category"])
+        self.assertEqual(analysis["total_expenses"], 17000)
+        self.assertEqual(monthly_document.filtered_total_expenses, 17000)
+        self.assertEqual(monthly_document.filtered_expenses_count, 3)
+
+    def test_expense_analysis_excludes_uncategorized_and_named_category(self) -> None:
+        Transaction.objects.create(
+            document=self.doc, transaction_type="expense", amount=700, description="Unknown", category=""
+        )
+        service = ExpenseAnalyzerService(self.user)
+        analysis = service.get_expense_analysis(exclude_categories=["Uncategorized", "Transport"])
+        monthly_document = analysis["documents"][0]
+        cats = analysis["expenses_by_category"]
+        self.assertNotIn("Uncategorized", cats)
+        self.assertNotIn("Transport", cats)
+        self.assertEqual(analysis["total_expenses"], 12000)
+        self.assertEqual(monthly_document.filtered_total_expenses, 12000)
+        self.assertEqual(monthly_document.filtered_expenses_count, 2)
 
     def test_income_analysis_excludes_category(self) -> None:
         service = ExpenseAnalyzerService(self.user)
@@ -549,6 +578,8 @@ class AnalyzerViewExcludeTests(TestCase):
         ctx = response.context
         self.assertIn("Transport", ctx["exclude_categories"])
         self.assertNotIn("Transport", ctx["analysis"]["expenses_by_category"])
+        self.assertContains(response, "Rp10.000")
+        self.assertContains(response, "exclude_category=Transport")
 
     def test_income_analyzer_view_includes_exclude_categories_context(self) -> None:
         self.client.login(username="tester", password="pass")
