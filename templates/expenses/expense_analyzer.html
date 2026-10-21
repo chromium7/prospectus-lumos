@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load formatting %}
+{% load formatting static %}
 
 {% block title %}Expense Analyzer - Prospectus Lumos{% endblock %}
 
@@ -278,7 +278,6 @@
             </div>
         </div>
 
-        {% if analysis.expenses_by_category|length > 1 %}
         <div class="row mt-3">
             <div class="col-12 mb-3">
                 <h6>Expense Trend</h6>
@@ -286,14 +285,47 @@
                     <canvas id="expenseTrendChart"></canvas>
                 </div>
             </div>
+            <div class="col-12 mb-3">
+                <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-2">
+                    <div>
+                        <h6 class="mb-1">Annual Category Mix</h6>
+                        <small class="text-muted">Each bar shows how expense categories make up that year's total.</small>
+                    </div>
+                    <div class="dropdown" id="annual-category-filter">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Categories: <span id="annual-category-filter-label">All shown</span>
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-end p-2" id="annual-category-filter-menu" style="min-width: 240px; max-height: 280px; overflow-y: auto;">
+                            <div class="d-flex justify-content-between gap-3 mb-1 px-1">
+                                <small class="text-muted">Show in chart</small>
+                                <span>
+                                    <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none" id="annual-category-select-all">All</button>
+                                    <span class="text-muted" aria-hidden="true"> / </span>
+                                    <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none" id="annual-category-select-none">None</button>
+                                </span>
+                            </div>
+                            {% for dataset in analysis.yearly_category_chart.datasets %}
+                            <label class="dropdown-item d-flex align-items-center gap-2 rounded" style="cursor: pointer;">
+                                <input type="checkbox" class="form-check-input annual-category-checkbox" data-category-index="{{ forloop.counter0 }}" checked>
+                                <span>{{ dataset.label }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <div class="p-3 border rounded" style="max-width: 920px; margin: 0 auto;">
+                    <canvas id="expenseCategoryYearChart" role="img" aria-label="Stacked bar chart of annual expenses by category"></canvas>
+                </div>
+            </div>
+            {% if analysis.expenses_by_category|length > 1 %}
             <div class="col-12">
                 <h6>Category Breakdown</h6>
                 <div class="p-3 border rounded chart-container" style="max-width: 640px; margin: 0 auto;">
                     <canvas id="expenseCategoryChart"></canvas>
                 </div>
             </div>
+            {% endif %}
         </div>
-        {% endif %}
     </div>
 </div>
 {% endif %}
@@ -337,6 +369,8 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 {% if analysis.expenses_by_category %}
+{{ analysis.yearly_category_chart|json_script:"expense-category-year-data" }}
+<script src="{% static 'js/expense-category-year-chart.js' %}"></script>
 <script>
   (function() {
     // Trend chart
