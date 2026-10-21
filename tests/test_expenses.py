@@ -492,6 +492,59 @@ class ExpenseAnalyzerServiceExcludeTests(TestCase):
         self.assertIn("Transport", cats)
         self.assertEqual(analysis["total_expenses"], 17000)
 
+    def test_expense_analysis_builds_annual_category_chart_data(self) -> None:
+        older_document = Document.objects.create(user=self.user, source=self.source, month=8, year=2024)
+        Transaction.objects.create(
+            document=older_document,
+            transaction_type="expense",
+            amount=7000,
+            description="Market",
+            category="Food",
+        )
+        Transaction.objects.create(
+            document=older_document,
+            transaction_type="expense",
+            amount=3000,
+            description="Power",
+            category="Utilities",
+        )
+
+        analysis = ExpenseAnalyzerService(self.user).get_expense_analysis(exclude_categories=["Transport"])
+
+        self.assertEqual(analysis["yearly_category_chart"]["years"], [2024, 2025])
+        self.assertEqual(
+            analysis["yearly_category_chart"]["datasets"],
+            [
+                {"label": "Food", "data": [7000.0, 12000.0]},
+                {"label": "Utilities", "data": [3000.0, 0.0]},
+            ],
+        )
+
+        year_analysis = ExpenseAnalyzerService(self.user).get_expense_analysis(
+            year=2025,
+            exclude_categories=["Transport"],
+        )
+        self.assertEqual(year_analysis["yearly_category_chart"]["years"], [2025])
+        self.assertEqual(
+            year_analysis["yearly_category_chart"]["datasets"],
+            [{"label": "Food", "data": [12000.0]}],
+        )
+
+        july_document = Document.objects.create(user=self.user, source=self.source, month=7, year=2024)
+        Transaction.objects.create(
+            document=july_document,
+            transaction_type="expense",
+            amount=9000,
+            description="Rent",
+            category="Housing",
+        )
+        month_analysis = ExpenseAnalyzerService(self.user).get_expense_analysis(month=7)
+        self.assertEqual(month_analysis["yearly_category_chart"]["years"], [2024])
+        self.assertEqual(
+            month_analysis["yearly_category_chart"]["datasets"],
+            [{"label": "Housing", "data": [9000.0]}],
+        )
+
 
 class AnalyzerViewExcludeTests(TestCase):
     def setUp(self) -> None:
@@ -563,3 +616,13 @@ class AnalyzerViewExcludeTests(TestCase):
         ctx = response.context
         self.assertIn("available_categories", ctx)
         self.assertEqual(set(ctx["available_categories"]), {"Food", "Transport"})
+
+    def test_expense_insights_renders_annual_category_chart_and_client_filter(self) -> None:
+        self.client.login(username="tester", password="pass")
+
+        response = self.client.get(reverse("expense_analyzer"))
+
+        self.assertContains(response, "Annual Category Mix")
+        self.assertContains(response, 'id="expenseCategoryYearChart"')
+        self.assertContains(response, 'id="annual-category-filter"')
+        self.assertContains(response, "expense-category-year-chart.js")
