@@ -1,6 +1,7 @@
 import csv
 import io
 import re
+from calendar import month_name as calendar_month_name
 from typing import List, Tuple, Dict, Any
 from decimal import Decimal
 
@@ -411,7 +412,7 @@ class ExpenseAnalyzerService:
 
         # Group by category (skip excluded)
         expenses_by_category: Dict[str, Dict[str, Any]] = {}
-        yearly_category_totals: dict[int, dict[str, Decimal]] = {}
+        monthly_category_totals: dict[tuple[int, int], dict[str, Decimal]] = {}
         for doc in documents:
             expense_transactions = doc.transactions.filter(transaction_type="expense")
             for transaction in expense_transactions:
@@ -422,8 +423,8 @@ class ExpenseAnalyzerService:
                     expenses_by_category[category] = {"total": Decimal("0"), "count": 0, "average": Decimal("0")}
                 expenses_by_category[category]["total"] += transaction.amount
                 expenses_by_category[category]["count"] += 1
-                yearly_totals = yearly_category_totals.setdefault(doc.year, {})
-                yearly_totals[category] = yearly_totals.get(category, Decimal("0")) + transaction.amount
+                monthly_totals = monthly_category_totals.setdefault((doc.year, doc.month), {})
+                monthly_totals[category] = monthly_totals.get(category, Decimal("0")) + transaction.amount
 
         # Calculate averages for categories
         for category_data in expenses_by_category.values():
@@ -434,17 +435,19 @@ class ExpenseAnalyzerService:
         total_expenses: Decimal = sum((cat["total"] for cat in expenses_by_category.values()), Decimal("0"))
         document_count: int = documents.count()
         average_expenses: Decimal | int = total_expenses / document_count if document_count > 0 else 0
-        chart_years = sorted(yearly_category_totals)
+        chart_months = sorted(monthly_category_totals)
         chart_categories = sorted(
             expenses_by_category,
             key=lambda category: (-expenses_by_category[category]["total"], category.casefold()),
         )
-        yearly_category_chart = {
-            "years": chart_years,
+        monthly_category_chart = {
+            "months": [f"{calendar_month_name[month]} {year}" for year, month in chart_months],
             "datasets": [
                 {
                     "label": category,
-                    "data": [float(yearly_category_totals[year].get(category, Decimal("0"))) for year in chart_years],
+                    "data": [
+                        float(monthly_category_totals[period].get(category, Decimal("0"))) for period in chart_months
+                    ],
                 }
                 for category in chart_categories
             ],
@@ -455,8 +458,8 @@ class ExpenseAnalyzerService:
             "average_expenses": average_expenses,
             "document_count": document_count,
             "expenses_by_category": expenses_by_category,
-            "documents": documents.order_by("-year", "-month"),
-            "yearly_category_chart": yearly_category_chart,
+            "documents": monthly_documents,
+            "monthly_category_chart": monthly_category_chart,
         }
 
     def get_portfolio_analysis(self, start_year: int | None = None, end_year: int | None = None) -> Dict[str, Any]:

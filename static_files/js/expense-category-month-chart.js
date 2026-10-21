@@ -1,8 +1,8 @@
 (function () {
   'use strict';
 
-  var dataElement = document.getElementById('expense-category-year-data');
-  var canvas = document.getElementById('expenseCategoryYearChart');
+  var dataElement = document.getElementById('expense-category-month-data');
+  var canvas = document.getElementById('expenseCategoryMonthChart');
   if (!dataElement || !canvas || typeof Chart === 'undefined') {
     return;
   }
@@ -14,9 +14,9 @@
     return;
   }
 
-  var years = chartData.years || [];
+  var months = chartData.months || [];
   var sourceDatasets = chartData.datasets || [];
-  if (years.length === 0 || sourceDatasets.length === 0) {
+  if (months.length === 0 || sourceDatasets.length === 0) {
     return;
   }
 
@@ -47,7 +47,7 @@
 
   var chart = new Chart(canvas, {
     type: 'bar',
-    data: { labels: years, datasets: datasets },
+    data: { labels: months, datasets: datasets },
     options: {
       responsive: true,
       maintainAspectRatio: true,
@@ -78,11 +78,11 @@
     }
   });
 
-  var menu = document.getElementById('annual-category-filter-menu');
-  var filterLabel = document.getElementById('annual-category-filter-label');
-  var checkboxes = document.querySelectorAll('.annual-category-checkbox');
-  var selectAll = document.getElementById('annual-category-select-all');
-  var selectNone = document.getElementById('annual-category-select-none');
+  var menu = document.getElementById('monthly-category-filter-menu');
+  var filterLabel = document.getElementById('monthly-category-filter-label');
+  var checkboxes = document.querySelectorAll('.monthly-category-checkbox');
+  var selectAll = document.getElementById('monthly-category-select-all');
+  var selectNone = document.getElementById('monthly-category-select-none');
 
   if (menu) {
     menu.addEventListener('click', function (event) {
