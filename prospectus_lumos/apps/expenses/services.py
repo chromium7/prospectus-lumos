@@ -6,7 +6,7 @@ from decimal import Decimal
 
 from django.core.files.base import ContentFile
 from django.db import transaction as db_transaction
-from django.db.models import Sum
+from django.db.models import Count, Q, Sum
 from django.utils import timezone
 
 from libraries.google_cloud.backends import GoogleDriveBackend
@@ -397,6 +397,18 @@ class ExpenseAnalyzerService:
 
         exclude_set = set(exclude_categories) if exclude_categories else set()
 
+        included_expenses = Q(transactions__transaction_type=Transaction.TransactionType.EXPENSE)
+        named_exclusions = exclude_set - {"Uncategorized"}
+        if named_exclusions:
+            included_expenses &= ~Q(transactions__category__in=named_exclusions)
+        if "Uncategorized" in exclude_set:
+            included_expenses &= ~Q(transactions__category="")
+
+        monthly_documents = documents.annotate(
+            filtered_total_expenses=Sum("transactions__amount", filter=included_expenses, default=Decimal("0")),
+            filtered_expenses_count=Count("transactions", filter=included_expenses),
+        ).order_by("-year", "-month")
+
         # Group by category (skip excluded)
         expenses_by_category: Dict[str, Dict[str, Any]] = {}
         for doc in documents:
@@ -425,7 +437,7 @@ class ExpenseAnalyzerService:
             "average_expenses": average_expenses,
             "document_count": document_count,
             "expenses_by_category": expenses_by_category,
-            "documents": documents.order_by("-year", "-month"),
+            "documents": monthly_documents,
         }
 
     def get_portfolio_analysis(self, start_year: int | None = None, end_year: int | None = None) -> Dict[str, Any]:
