@@ -36,6 +36,30 @@ class AppShellTests(TestCase):
         self.assertContains(response, "data-app-live-region")
         self.assertContains(response, 'class="dropdown-menu dropdown-menu-end profile-menu"')
 
+    def test_navigation_omits_routes_the_revised_plan_dropped(self) -> None:
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("app:home"))
+
+        for dropped in ('/app/transactions"', "/app/budgets/", "/app/reports"):
+            self.assertNotContains(response, dropped)
+
+    def test_navigation_offers_the_add_transaction_page_on_desktop_and_mobile(self) -> None:
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("app:home"))
+
+        self.assertContains(response, "Add transaction")
+        self.assertContains(response, f'href="{reverse("app:transaction_create")}"')
+
+    def test_create_page_marks_its_own_navigation_entry_current(self) -> None:
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("app:transaction_create"))
+
+        self.assertEqual(response.context["selected_tab"], "app_add")
+        self.assertContains(response, f'href="{reverse("app:transaction_create")}" aria-current="page"')
+
     def test_dashboard_renders_a_server_side_empty_state(self) -> None:
         self.client.force_login(self.user)
 
