@@ -762,6 +762,12 @@ body :focus-visible {
   font-size: 0.9rem;
 }
 
+.transaction-form__save-state {
+  margin: 0.75rem 0 0;
+  color: var(--warning-color);
+  font-weight: 650;
+}
+
 .transaction-form__actions {
   display: flex;
   justify-content: flex-end;

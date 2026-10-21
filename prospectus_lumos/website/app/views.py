@@ -1,7 +1,9 @@
 import re
+from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import DatabaseError
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -48,14 +50,27 @@ def transaction_create_view(request: TypedHttpRequest) -> HttpResponse:
     """Render and process a server-side manual transaction form."""
 
     fallback_url = reverse("app:home")
+    return_url = safe_return_url(request, fallback=fallback_url)
+    request_failed = False
     if request.method == "POST":
         form = TransactionForm(request.POST, user=request.user)
         if form.is_valid():
-            saved = form.save()
-            messages.success(request, f"{saved.get_transaction_type_display()} saved.")
-            if request.POST.get("save_action") == "save_another":
-                return redirect("app:transaction_create")
-            return redirect(safe_return_url(request, fallback=fallback_url))
+            try:
+                saved = form.save()
+            except DatabaseError:
+                request_failed = True
+                form.add_error(
+                    None,
+                    "We couldn't save this transaction. Your entries are still here; please try again.",
+                )
+            else:
+                messages.success(request, f"{saved.get_transaction_type_display()} saved.")
+                if request.POST.get("save_action") == "save_another":
+                    if return_url == fallback_url:
+                        return redirect("app:transaction_create")
+                    query = urlencode({"next": return_url})
+                    return redirect(f"{reverse('app:transaction_create')}?{query}")
+                return redirect(return_url)
     else:
         form = TransactionForm(
             user=request.user,
@@ -70,9 +85,9 @@ def transaction_create_view(request: TypedHttpRequest) -> HttpResponse:
         "app/transaction_form.html",
         {
             "form": form,
-            "next": safe_return_url(request, fallback=fallback_url),
+            "next": return_url,
             "recent_categories": recent_transaction_categories(request.user),
             "selected_tab": "app_activity",
         },
-        status=400 if request.method == "POST" else 200,
+        status=503 if request_failed else 400 if request.method == "POST" else 200,
     )
