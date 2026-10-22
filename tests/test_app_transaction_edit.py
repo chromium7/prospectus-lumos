@@ -100,7 +100,6 @@ class TransactionEditPageTests(TestCase):
         self.assertContains(response, 'value="Weekly groceries"')
         self.assertContains(response, 'for="id_amount"')
         self.assertContains(response, 'for="id_date"')
-        self.assertContains(response, "Enter the IDR amount without thousands separators.")
         self.assertContains(response, "Save changes")
         self.assertNotContains(response, "Save and add another")
         self.assertContains(response, 'data-loading-text="Updating transaction…"')

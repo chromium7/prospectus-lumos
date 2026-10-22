@@ -7,15 +7,7 @@
 <div class="transaction-page">
     <header class="transaction-page__header">
         <div>
-            <p class="dashboard__eyebrow">{% if page_mode == "edit" %}Keep records accurate{% else %}Record money clearly{% endif %}</p>
             <h1 class="h2 mb-1">{% if page_mode == "edit" %}Edit transaction{% else %}Add transaction{% endif %}</h1>
-            <p class="text-muted mb-0">
-                {% if page_mode == "edit" %}
-                    {% if is_editable %}Update this manual entry, including its date or month.{% else %}Review where this imported entry is managed.{% endif %}
-                {% else %}
-                    Record income or an expense without tracking an account.
-                {% endif %}
-            </p>
         </div>
         <a class="btn btn-outline-secondary" href="{{ next }}">{% if is_editable or page_mode == "create" %}Cancel{% else %}Back{% endif %}</a>
     </header>
@@ -54,7 +46,6 @@
                     <span class="input-group-text">Rp</span>
                     {{ form.amount }}
                 </div>
-                <p class="form-text">Enter the IDR amount without thousands separators.</p>
                 {% for error in form.amount.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
             </div>
 
@@ -79,7 +70,6 @@
                     <datalist id="recent-transaction-categories">
                         {% for category in recent_categories %}<option value="{{ category }}"></option>{% endfor %}
                     </datalist>
-                    <p class="form-text">Recent categories appear as suggestions while you type.</p>
                     {% endif %}
                     {% for error in form.category.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
                 </div>
@@ -95,10 +85,6 @@
                 </div>
             </div>
 
-            <div class="transaction-offline-note" role="note">
-                <i class="bi bi-cloud-check" aria-hidden="true"></i>
-                <span>This entry is saved only after the confirmation appears. If you go offline, reconnect before trying again.</span>
-            </div>
             <div class="alert alert-warning mt-3" role="alert" tabindex="-1" data-connection-error hidden>
                 You’re offline. Your entries are still here and have not been saved. Reconnect, then try again.
             </div>

@@ -793,17 +793,6 @@ body :focus-visible {
   grid-column: 1 / -1;
 }
 
-.transaction-offline-note {
-  display: flex;
-  gap: 0.65rem;
-  margin-top: 1.5rem;
-  padding: 0.8rem 1rem;
-  border-radius: 0.75rem;
-  background: var(--sidebar-bg);
-  color: var(--muted-text);
-  font-size: 0.9rem;
-}
-
 .transaction-form__save-state {
   margin: 0.75rem 0 0;
   color: var(--warning-color);
