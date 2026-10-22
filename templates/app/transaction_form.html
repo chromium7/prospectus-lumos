@@ -1,20 +1,41 @@
 {% extends "base.html" %}
+{% load formatting %}
 
-{% block title %}Add transaction - Prospectus Lumos{% endblock %}
+{% block title %}{% if page_mode == "edit" %}Edit{% else %}Add{% endif %} transaction - Prospectus Lumos{% endblock %}
 
 {% block content %}
 <div class="transaction-page">
     <header class="transaction-page__header">
         <div>
-            <p class="dashboard__eyebrow">Record money clearly</p>
-            <h1 class="h2 mb-1">Add transaction</h1>
-            <p class="text-muted mb-0">Record income or an expense without tracking an account.</p>
+            <p class="dashboard__eyebrow">{% if page_mode == "edit" %}Keep records accurate{% else %}Record money clearly{% endif %}</p>
+            <h1 class="h2 mb-1">{% if page_mode == "edit" %}Edit transaction{% else %}Add transaction{% endif %}</h1>
+            <p class="text-muted mb-0">
+                {% if page_mode == "edit" %}
+                    {% if is_editable %}Update this manual entry, including its date or month.{% else %}Review where this imported entry is managed.{% endif %}
+                {% else %}
+                    Record income or an expense without tracking an account.
+                {% endif %}
+            </p>
         </div>
-        <a class="btn btn-outline-secondary" href="{{ next }}">Cancel</a>
+        <a class="btn btn-outline-secondary" href="{{ next }}">{% if is_editable or page_mode == "create" %}Cancel{% else %}Back{% endif %}</a>
     </header>
 
+    {% if page_mode == "edit" %}
+    <section class="transaction-origin mt-4" aria-labelledby="transaction-origin-title">
+        <div>
+            <p class="transaction-origin__label" id="transaction-origin-title">Origin</p>
+            <p class="transaction-origin__value mb-0">{{ transaction.get_origin_display }}</p>
+        </div>
+        <span class="transaction-origin__status{% if not is_editable %} transaction-origin__status--read-only{% endif %}">
+            {% if is_editable %}<i class="bi bi-pencil" aria-hidden="true"></i> Editable here{% else %}<i class="bi bi-lock" aria-hidden="true"></i> Read only{% endif %}
+        </span>
+    </section>
+    {% endif %}
+
+    {% if is_editable or page_mode == "create" %}
     <form class="card transaction-form mt-4" method="post" novalidate data-loading
-          data-loading-text="Saving transaction…" data-confirm-leave data-requires-connection{% if form.is_bound %} data-dirty{% endif %}>
+          data-loading-text="{% if page_mode == 'edit' %}Updating transaction…{% else %}Saving transaction…{% endif %}"
+          data-confirm-leave data-requires-connection{% if form.is_bound %} data-dirty{% endif %}>
         <div class="card-body p-3 p-md-4">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ next }}">
@@ -33,6 +54,7 @@
                     <span class="input-group-text">Rp</span>
                     {{ form.amount }}
                 </div>
+                <p class="form-text">Enter the IDR amount without thousands separators.</p>
                 {% for error in form.amount.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
             </div>
 
@@ -85,9 +107,41 @@
             </p>
         </div>
         <footer class="card-footer transaction-form__actions">
-            <button class="btn btn-primary" type="submit" name="save_action" value="save">Save transaction</button>
+            <button class="btn btn-primary" type="submit" name="save_action" value="save">
+                {% if page_mode == "edit" %}Save changes{% else %}Save transaction{% endif %}
+            </button>
+            {% if page_mode == "create" %}
             <button class="btn btn-outline-primary" type="submit" name="save_action" value="save_another">Save and add another</button>
+            {% endif %}
         </footer>
     </form>
+    {% else %}
+    <section class="card transaction-read-only mt-4" aria-labelledby="read-only-heading">
+        <div class="card-body p-3 p-md-4">
+            <div class="alert alert-info transaction-read-only__notice" role="status">
+                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                <div>
+                    <h2 class="h5" id="read-only-heading">This transaction is managed by its import source</h2>
+                    <p class="mb-0">To keep future syncs consistent, update the source data and import the month again.</p>
+                </div>
+            </div>
+
+            <dl class="transaction-read-only__details">
+                <div><dt>Amount</dt><dd>{{ transaction.amount|idr }}</dd></div>
+                <div><dt>Type</dt><dd>{{ transaction.get_transaction_type_display }}</dd></div>
+                <div><dt>Category</dt><dd>{{ transaction.category|default:"Uncategorized" }}</dd></div>
+                <div><dt>Date from source</dt><dd>{{ transaction.date }}</dd></div>
+                <div class="transaction-read-only__wide"><dt>Description</dt><dd>{{ transaction.description }}</dd></div>
+                {% if transaction.document.source %}
+                <div class="transaction-read-only__wide"><dt>Source</dt><dd>{{ transaction.document.source.name }}</dd></div>
+                {% endif %}
+            </dl>
+        </div>
+        <footer class="card-footer transaction-form__actions">
+            {% if transaction.document %}<a class="btn btn-primary" href="{% url 'document_detail' transaction.document.id %}">Review imported month</a>{% endif %}
+            <a class="btn btn-outline-secondary" href="{% url 'source_list' %}">Manage sources</a>
+        </footer>
+    </section>
+    {% endif %}
 </div>
 {% endblock %}

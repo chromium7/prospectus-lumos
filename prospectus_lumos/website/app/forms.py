@@ -6,7 +6,7 @@ from django import forms
 from django.contrib.auth.models import User
 
 from prospectus_lumos.apps.transactions.models import Transaction
-from prospectus_lumos.apps.transactions.services import create_manual_transaction
+from prospectus_lumos.apps.transactions.services import create_manual_transaction, edit_manual_transaction
 from prospectus_lumos.core.validators import (
     validate_choice,
     validate_date_only,
@@ -50,6 +50,7 @@ class TransactionForm(forms.ModelForm):
     def __init__(self, *args: Any, user: User, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.user = user
+        self.transaction_id = self.instance.pk
         self.fields["category"].required = True
         self.fields["category"].error_messages["required"] = "Choose or enter a category."
 
@@ -85,14 +86,21 @@ class TransactionForm(forms.ModelForm):
     def save(self, commit: bool = True) -> Transaction:
         occurred_on: date_type = self.cleaned_data["date"]
         if commit:
-            self.instance = create_manual_transaction(
-                user=self.user,
-                transaction_type=self.cleaned_data["transaction_type"],
-                date=occurred_on,
-                amount=self.cleaned_data["amount"],
-                description=self.cleaned_data["description"],
-                category=self.cleaned_data["category"],
-            )
+            values = {
+                "user": self.user,
+                "transaction_type": self.cleaned_data["transaction_type"],
+                "date": occurred_on,
+                "amount": self.cleaned_data["amount"],
+                "description": self.cleaned_data["description"],
+                "category": self.cleaned_data["category"],
+            }
+            if self.transaction_id is None:
+                self.instance = create_manual_transaction(**values)
+            else:
+                self.instance = edit_manual_transaction(
+                    transaction_id=self.transaction_id,
+                    **values,
+                )
             return self.instance
 
         transaction = super().save(commit=False)
