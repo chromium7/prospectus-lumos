@@ -26,7 +26,6 @@
       <div class="mb-4">
         <label class="form-label fw-semibold" for="{{ plan_form.name.id_for_label }}">Give this plan a name</label>
         {{ plan_form.name }}{{ plan_form.name.errors }}
-        <div class="form-text">For example, “More choices by age 45” or “A calmer retirement”.</div>
       </div>
       <div class="mb-4">
         <label class="form-label fw-semibold" for="{{ plan_form.description.id_for_label }}">Why is this goal important to you? <span class="text-muted fw-normal">(optional)</span></label>
@@ -41,7 +40,6 @@
         <div class="col-md-6">
           <label class="form-label fw-semibold" for="{{ goal_form.birth_date.id_for_label }}">When were you born? <span class="text-muted fw-normal">(optional)</span></label>
           {{ goal_form.birth_date }}{{ goal_form.birth_date.errors }}
-          <div class="form-text">This helps us describe your timeline in years.</div>
         </div>
         <div class="col-md-6">
           <label class="form-label fw-semibold" for="{{ goal_form.desired_monthly_lifestyle.id_for_label }}">How much would you like to spend each month?</label>

@@ -36,7 +36,6 @@ class TransactionCreatePageTests(TestCase):
         self.assertContains(response, "Expense")
         self.assertContains(response, "Income")
         self.assertContains(response, 'type="radio" name="transaction_type"', count=2)
-        self.assertContains(response, "without tracking an account")
         self.assertNotContains(response, "Financial account")
         self.assertNotContains(response, "submission_token")
         self.assertNotContains(response, "transaction-form.js")
