@@ -92,7 +92,7 @@ def transaction_create_view(request: TypedHttpRequest) -> HttpResponse:
             "form": form,
             "next": return_url,
             "recent_categories": recent_categories,
-            "selected_tab": "app_activity",
+            "selected_tab": "app_add",
         },
         status=503 if request_failed else 400 if request.method == "POST" else 200,
     )

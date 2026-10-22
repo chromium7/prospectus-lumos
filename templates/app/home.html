@@ -63,7 +63,6 @@
             <div class="card-body">
                 <div class="dashboard-panel__heading">
                     <div><p class="dashboard__eyebrow">Monthly plan</p><h2 class="h4" id="budget-progress-title">Budget progress</h2></div>
-                    <a href="/app/budgets/{{ month }}">View plan</a>
                 </div>
                 <div>
                     {% for category in dashboard.budget_categories %}
@@ -86,7 +85,7 @@
             <div class="card-body">
                 <div class="dashboard-panel__heading">
                     <div><p class="dashboard__eyebrow">Latest changes</p><h2 class="h4" id="recent-activity-title">Recent activity</h2></div>
-                    <a href="/app/transactions">View all</a>
+                    <a href="{% url 'document_list' %}">View all</a>
                 </div>
                 <ul class="dashboard-activity">
                     {% for transaction in dashboard.recent_activity %}
