@@ -23,6 +23,47 @@ class TransactionEditConflict(ValueError):
     """Raised when a transaction moves while an edit is acquiring its month locks."""
 
 
+class ImportedTransactionDeleteError(ValueError):
+    """Raised when deletion is attempted for a source-managed transaction."""
+
+
+class TransactionDeleteConflict(ValueError):
+    """Raised when a transaction moves while deletion acquires its month lock."""
+
+
+def delete_manual_transaction(*, user: User, transaction_id: int) -> None:
+    """Delete an owner's manual row and atomically refresh its combined monthly summary.
+
+    Callers must obtain confirmation before invoking this destructive operation. The monthly
+    document and all retained transaction IDs and import metadata are preserved. Owner-only
+    rows without a document can also be deleted; they have no monthly summary to refresh.
+
+    :param user: authenticated owner from trusted caller context.
+    :param transaction_id: primary key of the confirmed transaction to delete.
+    :return: None.
+    :raises Transaction.DoesNotExist: if the row does not exist or belongs to another user.
+    :raises ImportedTransactionDeleteError: if the row is managed by an import source.
+    :raises TransactionDeleteConflict: if the row moved while its month lock was acquired.
+    """
+
+    ownership = Q(user=user) | Q(document__user=user)
+    with transaction.atomic():
+        existing = Transaction.objects.select_related("document").filter(ownership).get(pk=transaction_id)
+        if existing.origin != Transaction.Origin.MANUAL:
+            raise ImportedTransactionDeleteError("Imported transactions must be deleted through their source workflow.")
+
+        document = lock_documents(existing.document)[0] if existing.document is not None else None
+        deleted = Transaction.objects.select_for_update(of=("self",)).filter(ownership).get(pk=transaction_id)
+        if deleted.origin != Transaction.Origin.MANUAL:
+            raise ImportedTransactionDeleteError("Imported transactions must be deleted through their source workflow.")
+        if deleted.document_id != existing.document_id:
+            raise TransactionDeleteConflict("The transaction moved while it was being deleted; reload and try again.")
+
+        deleted.delete()
+        if document is not None:
+            recalculate_document_summary(document=document)
+
+
 def create_manual_transaction(
     *,
     user: User,
