@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% load formatting %}
+
+{% block title %}Delete transaction - Prospectus Lumos{% endblock %}
+{% block extra_css %}{% endblock %}
+{% block extra_js %}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body">
+        <h1 class="h3">{% if is_manual %}Delete manual transaction?{% else %}Imported transaction{% endif %}</h1>
+        {% if error %}
+        <div class="alert alert-danger" role="alert" tabindex="-1" data-form-errors>{{ error }}</div>
+        {% endif %}
+        <p class="text-muted">{{ document.month_name }} {{ document.year }} &middot; {{ transaction.get_origin_display }}</p>
+        <dl class="row">
+            <dt class="col-sm-3">Description</dt><dd class="col-sm-9 text-break">{{ transaction.description }}</dd>
+            <dt class="col-sm-3">Date</dt><dd class="col-sm-9">{{ transaction.date }}</dd>
+            <dt class="col-sm-3">Type</dt><dd class="col-sm-9">{{ transaction.get_transaction_type_display }}</dd>
+            <dt class="col-sm-3">Amount</dt><dd class="col-sm-9">{{ transaction.amount|idr }}</dd>
+            <dt class="col-sm-3">Category</dt><dd class="col-sm-9">{{ transaction.category|default:"Uncategorized" }}</dd>
+        </dl>
+        {% if is_manual %}
+        <p id="delete-warning">This permanently deletes this manual transaction and updates the monthly totals. This cannot be undone.</p>
+        <form method="post" aria-describedby="delete-warning" data-loading data-loading-text="Deleting transaction…">
+            {% csrf_token %}
+            <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-outline-secondary" href="{% url 'document_detail' document.pk %}">Cancel</a>
+                <button class="btn btn-danger" type="submit">Delete transaction</button>
+            </div>
+        </form>
+        {% else %}
+        <p role="status">This imported transaction is read-only here. Update the source data and import the month again.</p>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-outline-secondary" href="{% url 'document_detail' document.pk %}">Back to month</a>
+            <a class="btn btn-primary" href="{% url 'source_list' %}">Manage sources</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
