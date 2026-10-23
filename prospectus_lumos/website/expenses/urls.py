@@ -9,6 +9,11 @@ urlpatterns = [
     path("", views.dashboard_view, name="dashboard"),
     path("documents/", views.document_list_view, name="document_list"),
     path("documents/<int:document_id>/", views.document_detail_view, name="document_detail"),
+    path(
+        "documents/<int:document_id>/transactions/<int:transaction_id>/delete/",
+        views.transaction_delete_view,
+        name="transaction_delete",
+    ),
     path("income-analyzer/", views.income_analyzer_view, name="income_analyzer"),
     path("expense-analyzer/", views.expense_analyzer_view, name="expense_analyzer"),
     path("portfolio-analyzer/", views.portfolio_analyzer_view, name="portfolio_analyzer"),

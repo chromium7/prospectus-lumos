@@ -2,7 +2,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
+from django.db import InterfaceError, OperationalError
 from django.views.decorators.http import require_http_methods
 from django.core.paginator import Paginator
 from django.db.models import Q
@@ -13,6 +14,12 @@ from django.utils import timezone
 from prospectus_lumos.apps.accounts.models import DocumentSource
 from prospectus_lumos.apps.documents.models import Document
 from prospectus_lumos.apps.expenses.services import ExpenseSheetService, ExpenseAnalyzerService
+from prospectus_lumos.apps.transactions.models import Transaction
+from prospectus_lumos.apps.transactions.services import (
+    ImportedTransactionDeleteError,
+    TransactionDeleteConflict,
+    delete_manual_transaction,
+)
 from prospectus_lumos.core.constants import MONTHS_LIST
 from prospectus_lumos.core.utils import TypedHttpRequest
 from .forms import DocumentTransactionFilterForm
@@ -155,6 +162,49 @@ def document_detail_view(request: TypedHttpRequest, document_id: int) -> HttpRes
     }
 
     return render(request, "expenses/document_detail.html", context)
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def transaction_delete_view(request: TypedHttpRequest, document_id: int, transaction_id: int) -> HttpResponse:
+    """Confirm a manual deletion before invoking the owner-scoped atomic service."""
+    document = get_object_or_404(Document, pk=document_id, user=request.user)
+    transaction = get_object_or_404(document.transactions.all(), pk=transaction_id)
+    error = ""
+    status = 200
+    is_manual = transaction.origin == Transaction.Origin.MANUAL
+
+    if request.method == "POST":
+        if not is_manual:
+            error = "Imported transactions are read-only here. Update them through their source workflow."
+            status = 409
+        else:
+            try:
+                delete_manual_transaction(user=request.user, transaction_id=transaction.pk)
+            except Transaction.DoesNotExist:
+                raise Http404("Transaction no longer exists.")
+            except (ImportedTransactionDeleteError, TransactionDeleteConflict) as exc:
+                error = str(exc)
+                status = 409
+            except (InterfaceError, OperationalError):
+                error = "We couldn't delete this transaction. Please try again."
+                status = 503
+            else:
+                messages.success(request, "Manual transaction deleted. Monthly totals have been updated.")
+                return redirect("document_detail", document_id=document.pk)
+
+    return render(
+        request,
+        "expenses/transaction_delete.html",
+        {
+            "document": document,
+            "transaction": transaction,
+            "is_manual": is_manual,
+            "error": error,
+            "selected_tab": "documents",
+        },
+        status=status,
+    )
 
 
 @login_required

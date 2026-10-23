@@ -2,24 +2,28 @@
 {% load formatting %}
 
 {% block title %}{{ document.month_name }} {{ document.year }} - Document Details{% endblock %}
+{% block extra_css %}{% endblock %}
+{% block extra_js %}{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex flex-wrap gap-3 justify-content-between align-items-center mb-4">
     <div>
         <h1 class="mb-1">Document Details</h1>
         <small class="text-muted">
             {{ document.month_name }} {{ document.year }} &middot;
             {{ document.source.get_source_type_display }} &mdash;
-            {{ document.google_sheet_name|default:"Manual Upload" }}
+            {{ document.google_sheet_name|default:document.source.name }}
         </small>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex flex-wrap gap-2">
         <a href="{% url 'document_list' %}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Back to Documents
         </a>
+        {% if document.csv_file %}
         <a href="{% url 'download_csv' document.id %}" class="btn btn-outline-primary">
             <i class="bi bi-download"></i> Download CSV
         </a>
+        {% endif %}
     </div>
 </div>
 
@@ -65,13 +69,13 @@
 <!-- Transactions Table -->
 <div class="card">
     <div class="card-header">
-        <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-2">
             <h5 class="mb-0">Transactions for {{ document.month_name }} {{ document.year }}</h5>
             <small class="text-muted">
                 {% if current_sort == 'amount' %}
                     Sorted by amount ({{ current_direction|default:'asc' }})
                 {% else %}
-                    Sorted by transaction date from the original sheet
+                    Sorted by transaction date
                 {% endif %}
             </small>
         </div>
@@ -79,7 +83,7 @@
             {{ filter_form.sort }}
             {{ filter_form.direction }}
             <div class="col-md-4 col-lg-3">
-                <label class="form-label mb-1">{{ filter_form.transaction_type.label }}</label>
+                <label class="form-label mb-1" for="{{ filter_form.transaction_type.id_for_label }}">{{ filter_form.transaction_type.label }}</label>
                 {{ filter_form.transaction_type }}
             </div>
             <div class="col-md-3 col-lg-2 d-flex align-items-end">
@@ -94,7 +98,7 @@
     </div>
     <div class="card-body">
         {% if transactions %}
-            <div class="table-responsive">
+            <div class="table-responsive" tabindex="0" role="region" aria-label="Monthly transactions; scroll for origin and actions">
                 <table class="table table-hover align-middle">
                     <thead>
                         <tr>
@@ -102,6 +106,7 @@
                             <th style="width: 12%">Type</th>
                             <th>Description</th>
                             <th style="width: 18%">Category</th>
+                            <th>Origin</th>
                             <th class="text-end" style="width: 16%">
                                 <a href="{% url 'document_detail' document.id %}?sort=amount&direction={% if current_sort == 'amount' and current_direction == 'asc' %}desc{% else %}asc{% endif %}{% if current_type %}&transaction_type={{ current_type }}{% endif %}"
                                    class="text-decoration-none">
@@ -111,6 +116,7 @@
                                     {% endif %}
                                 </a>
                             </th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -130,8 +136,20 @@
                                     <span class="text-muted">Uncategorized</span>
                                 {% endif %}
                             </td>
+                            <td><span class="badge bg-secondary">{{ tx.get_origin_display }}</span></td>
                             <td class="text-end {% if tx.transaction_type == 'income' %}text-success{% else %}text-danger{% endif %}">
                                 {{ tx.amount|idr }}
+                            </td>
+                            <td>
+                                {% if tx.origin == 'manual' %}
+                                <div class="d-flex flex-wrap gap-2">
+                                    <a class="btn btn-sm btn-outline-primary" href="{% url 'app:transaction_edit' tx.pk %}?next={{ request.get_full_path|urlencode }}" aria-label="Edit: {{ tx.description }}">Edit</a>
+                                    <a class="btn btn-sm btn-outline-danger" href="{% url 'transaction_delete' document.pk tx.pk %}" aria-label="Delete: {{ tx.description }}">Delete</a>
+                                </div>
+                                {% else %}
+                                <span class="text-muted small d-block">Read only</span>
+                                <a href="{% url 'app:transaction_edit' tx.pk %}?next={{ request.get_full_path|urlencode }}" aria-label="Source details: {{ tx.description }}">Source details</a>
+                                {% endif %}
                             </td>
                         </tr>
                         {% endfor %}
