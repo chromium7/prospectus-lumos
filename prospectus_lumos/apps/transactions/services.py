@@ -23,6 +23,48 @@ class TransactionEditConflict(ValueError):
     """Raised when a transaction moves while an edit is acquiring its month locks."""
 
 
+class ImportedTransactionDeleteError(ValueError):
+    """Raised when deletion is attempted for a source-managed transaction."""
+
+
+class TransactionDeleteConflict(ValueError):
+    """Raised when a transaction moves while deletion acquires its month lock."""
+
+
+@transaction.atomic
+def delete_manual_transaction(*, user: User, transaction_id: int) -> None:
+    """Delete an owner's manual row and atomically refresh its combined monthly summary.
+
+    Callers must obtain confirmation before invoking this destructive operation. The monthly
+    document and all retained transaction IDs and import metadata are preserved. Owner-only
+    rows without a document can also be deleted; they have no monthly summary to refresh.
+
+    :param user: authenticated owner from trusted caller context.
+    :param transaction_id: primary key of the confirmed transaction to delete.
+    :return: None.
+    :raises Transaction.DoesNotExist: if the row does not exist or belongs to another user.
+    :raises ImportedTransactionDeleteError: if the row is managed by an import source.
+    :raises TransactionDeleteConflict: if the row moved while its month lock was acquired.
+    """
+
+    ownership = Q(user=user) | Q(document__user=user)
+    existing = Transaction.objects.select_related("document").filter(ownership).get(pk=transaction_id)
+    if existing.origin != Transaction.Origin.MANUAL:
+        raise ImportedTransactionDeleteError("Imported transactions must be deleted through their source workflow.")
+
+    document = lock_documents(existing.document)[0] if existing.document is not None else None
+    deleted = Transaction.objects.select_for_update(of=("self",)).filter(ownership).get(pk=transaction_id)
+    if deleted.origin != Transaction.Origin.MANUAL:
+        raise ImportedTransactionDeleteError("Imported transactions must be deleted through their source workflow.")
+    if deleted.document_id != existing.document_id:
+        raise TransactionDeleteConflict("The transaction moved while it was being deleted; reload and try again.")
+
+    deleted.delete()
+    if document is not None:
+        recalculate_document_summary(document=document)
+
+
+@transaction.atomic
 def create_manual_transaction(
     *,
     user: User,
@@ -47,27 +89,27 @@ def create_manual_transaction(
     :return: the newly created manual transaction.
     """
 
-    with transaction.atomic():
-        document = resolve_monthly_document(
-            user=user,
-            year=date.year,
-            month=date.month,
-            for_update=True,
-        )
-        created = Transaction.objects.create(
-            user=user,
-            document=document,
-            transaction_type=transaction_type,
-            date=date.isoformat(),
-            amount=amount,
-            description=description,
-            category=category,
-            origin=Transaction.Origin.MANUAL,
-        )
-        recalculate_document_summary(document=document)
+    document = resolve_monthly_document(
+        user=user,
+        year=date.year,
+        month=date.month,
+        for_update=True,
+    )
+    created = Transaction.objects.create(
+        user=user,
+        document=document,
+        transaction_type=transaction_type,
+        date=date.isoformat(),
+        amount=amount,
+        description=description,
+        category=category,
+        origin=Transaction.Origin.MANUAL,
+    )
+    recalculate_document_summary(document=document)
     return created
 
 
+@transaction.atomic
 def edit_manual_transaction(
     *,
     user: User,
@@ -98,41 +140,40 @@ def edit_manual_transaction(
     """
 
     ownership = Q(user=user) | Q(document__user=user)
-    with transaction.atomic():
-        existing = Transaction.objects.select_related("document").filter(ownership).get(pk=transaction_id)
-        if existing.origin != Transaction.Origin.MANUAL:
-            raise ImportedTransactionEditError("Imported transactions must be edited through their source workflow.")
-        if existing.document is None:
-            raise TransactionEditConflict("The manual transaction is not assigned to a monthly document.")
+    existing = Transaction.objects.select_related("document").filter(ownership).get(pk=transaction_id)
+    if existing.origin != Transaction.Origin.MANUAL:
+        raise ImportedTransactionEditError("Imported transactions must be edited through their source workflow.")
+    if existing.document is None:
+        raise TransactionEditConflict("The manual transaction is not assigned to a monthly document.")
 
-        destination = resolve_monthly_document(user=user, year=date.year, month=date.month)
-        locked_documents = lock_documents(existing.document, destination)
-        documents_by_id = {document.pk: document for document in locked_documents}
+    destination = resolve_monthly_document(user=user, year=date.year, month=date.month)
+    locked_documents = lock_documents(existing.document, destination)
+    documents_by_id = {document.pk: document for document in locked_documents}
 
-        edited = Transaction.objects.select_for_update(of=("self",)).filter(ownership).get(pk=transaction_id)
-        if edited.origin != Transaction.Origin.MANUAL:
-            raise ImportedTransactionEditError("Imported transactions must be edited through their source workflow.")
-        if edited.document_id != existing.document_id:
-            raise TransactionEditConflict("The transaction moved while it was being edited; reload and try again.")
+    edited = Transaction.objects.select_for_update(of=("self",)).filter(ownership).get(pk=transaction_id)
+    if edited.origin != Transaction.Origin.MANUAL:
+        raise ImportedTransactionEditError("Imported transactions must be edited through their source workflow.")
+    if edited.document_id != existing.document_id:
+        raise TransactionEditConflict("The transaction moved while it was being edited; reload and try again.")
 
-        edited.document = documents_by_id[destination.pk]
-        edited.transaction_type = transaction_type
-        edited.date = date.isoformat()
-        edited.amount = amount
-        edited.description = description
-        edited.category = category
-        edited.save(
-            update_fields=[
-                "document",
-                "transaction_type",
-                "date",
-                "amount",
-                "description",
-                "category",
-            ]
-        )
+    edited.document = documents_by_id[destination.pk]
+    edited.transaction_type = transaction_type
+    edited.date = date.isoformat()
+    edited.amount = amount
+    edited.description = description
+    edited.category = category
+    edited.save(
+        update_fields=[
+            "document",
+            "transaction_type",
+            "date",
+            "amount",
+            "description",
+            "category",
+        ]
+    )
 
-        for document in locked_documents:
-            recalculate_document_summary(document=document)
+    for document in locked_documents:
+        recalculate_document_summary(document=document)
 
     return edited

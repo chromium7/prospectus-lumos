@@ -101,6 +101,7 @@ def resolve_monthly_document(
         return lock_documents(document)[0] if for_update else document
 
 
+@transaction.atomic
 def recalculate_document_summary(*, document: Document) -> Document:
     """Recalculate a document's income and expense totals and counts from its current rows.
 
@@ -113,23 +114,22 @@ def recalculate_document_summary(*, document: Document) -> Document:
     :raises ValueError: if the document has not been saved yet.
     """
 
-    with transaction.atomic():
-        locked_document = lock_documents(document)[0]
+    locked_document = lock_documents(document)[0]
 
-        income = Q(transaction_type=Transaction.TransactionType.INCOME)
-        expense = Q(transaction_type=Transaction.TransactionType.EXPENSE)
-        summary = Transaction.objects.filter(document=locked_document).aggregate(
-            total_income=Sum("amount", filter=income),
-            total_expenses=Sum("amount", filter=expense),
-            income_count=Count("pk", filter=income),
-            expenses_count=Count("pk", filter=expense),
-        )
+    income = Q(transaction_type=Transaction.TransactionType.INCOME)
+    expense = Q(transaction_type=Transaction.TransactionType.EXPENSE)
+    summary = Transaction.objects.filter(document=locked_document).aggregate(
+        total_income=Sum("amount", filter=income),
+        total_expenses=Sum("amount", filter=expense),
+        income_count=Count("pk", filter=income),
+        expenses_count=Count("pk", filter=expense),
+    )
 
-        locked_document.total_income = summary["total_income"] or Decimal("0")
-        locked_document.total_expenses = summary["total_expenses"] or Decimal("0")
-        locked_document.income_count = summary["income_count"]
-        locked_document.expenses_count = summary["expenses_count"]
-        locked_document.save(update_fields=_WRITTEN_SUMMARY_FIELDS)
+    locked_document.total_income = summary["total_income"] or Decimal("0")
+    locked_document.total_expenses = summary["total_expenses"] or Decimal("0")
+    locked_document.income_count = summary["income_count"]
+    locked_document.expenses_count = summary["expenses_count"]
+    locked_document.save(update_fields=_WRITTEN_SUMMARY_FIELDS)
 
     for field in _WRITTEN_SUMMARY_FIELDS:
         setattr(document, field, getattr(locked_document, field))

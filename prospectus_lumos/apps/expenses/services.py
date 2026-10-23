@@ -204,6 +204,7 @@ class ExpenseSheetService:
         # Bulk create transactions
         Transaction.objects.bulk_create(transactions)
 
+    @db_transaction.atomic
     def _replace_sheet_rows(
         self,
         document: Document,
@@ -223,12 +224,11 @@ class ExpenseSheetService:
         :param income: parsed income rows from the sheet.
         """
 
-        with db_transaction.atomic():
-            document.save()
-            lock_documents(document)
-            document.transactions.filter(origin=Transaction.Origin.GOOGLE_SHEETS).delete()
-            self._create_transaction_records(document, expenses, income)
-            recalculate_document_summary(document=document)
+        document.save()
+        lock_documents(document)
+        document.transactions.filter(origin=Transaction.Origin.GOOGLE_SHEETS).delete()
+        self._create_transaction_records(document, expenses, income)
+        recalculate_document_summary(document=document)
 
     def resync_document(self, document: Document) -> Document:
         """Re-sync a single Google Drive-backed document.
