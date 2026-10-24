@@ -139,17 +139,19 @@ def document_detail_view(request: TypedHttpRequest, document_id: int) -> HttpRes
     document = get_object_or_404(Document, id=document_id, user=request.user)
 
     base_qs = document.transactions.all()
-    filter_form = DocumentTransactionFilterForm(request.GET or None)
+    filter_form = DocumentTransactionFilterForm(request.GET)
     transactions = filter_form.apply(base_qs)
 
     if filter_form.is_valid():
         current_sort: str = filter_form.cleaned_data["sort"]
         current_direction: str = filter_form.cleaned_data["direction"]
         current_type: str = filter_form.cleaned_data["transaction_type"]
+        current_origin: str = filter_form.cleaned_data["origin"]
     else:
         current_sort = str(DocumentTransactionFilterForm.SORT_DATE)
         current_direction = str(DocumentTransactionFilterForm.DIRECTION_ASC)
         current_type = ""
+        current_origin = ""
 
     context = {
         "document": document,
@@ -158,6 +160,7 @@ def document_detail_view(request: TypedHttpRequest, document_id: int) -> HttpRes
         "current_sort": current_sort,
         "current_direction": current_direction,
         "current_type": current_type,
+        "current_origin": current_origin,
         "selected_tab": "documents",
     }
 

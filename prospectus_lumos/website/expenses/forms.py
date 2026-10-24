@@ -48,6 +48,12 @@ class DocumentTransactionFilterForm(forms.Form):
         label="Transaction type",
         coerce=str,
     )
+    origin = forms.ChoiceField(
+        choices=[("", "All origins"), *Transaction.Origin.choices],
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select"}),
+        label="Origin",
+    )
 
     def clean(self) -> dict[str, Any]:
         data = super().clean()
@@ -71,7 +77,7 @@ class DocumentTransactionFilterForm(forms.Form):
         return data
 
     def apply(self, qs: QuerySet[Transaction]) -> QuerySet[Transaction]:
-        """Apply type filter and ordering to the given queryset."""
+        """Apply type/origin filters and ordering to the given queryset."""
         if not self.is_valid():
             # fall back to default ordering by date
             return qs.order_by("date", "id")
@@ -82,6 +88,8 @@ class DocumentTransactionFilterForm(forms.Form):
 
         if tx_type:
             qs = qs.filter(transaction_type=tx_type)
+        if self.cleaned_data["origin"]:
+            qs = qs.filter(origin=self.cleaned_data["origin"])
 
         prefix = "" if direction == self.Direction.ASC else "-"
 

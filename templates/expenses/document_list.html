@@ -84,8 +84,10 @@
                                     {% if doc.google_sheet_id %}
                                         <small class="text-muted d-block">ID: {{ doc.google_sheet_id|truncatechars:15 }}</small>
                                     {% endif %}
+                                {% elif doc.source.source_type == 'manual' %}
+                                    <span class="text-muted">Manual entries</span>
                                 {% else %}
-                                    <span class="text-muted">Manual Upload</span>
+                                    <span class="text-muted">{{ doc.source.name }}</span>
                                 {% endif %}
                             </td>
                             <td>
@@ -117,9 +119,11 @@
                                         <i class="bi bi-arrow-repeat"></i>
                                     </button>
                                 </form>
+                                {% if doc.csv_file %}
                                 <a href="{% url 'download_csv' doc.id %}" class="btn btn-sm btn-outline-primary" title="Download CSV">
                                     <i class="bi bi-download"></i>
                                 </a>
+                                {% endif %}
                             </td>
                         </tr>
                         {% endfor %}
