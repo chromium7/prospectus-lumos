@@ -1,4 +1,9 @@
 :root {
+  --space-2: .5rem;
+  --space-3: .75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
   --primary-color: #4f46e5;
   --secondary-color: #6b7280;
   --success-color: #10b981;

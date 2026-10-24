@@ -1,0 +1,24 @@
+.budgets {
+  display: grid;
+  gap: var(--space-6);
+  min-width: 0;
+}
+.budgets__header, .budgets__rows { display: grid; gap: var(--space-4); }
+.budgets__month { display: grid; gap: var(--space-2); }
+.budgets__navigation { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); justify-content: space-between; }
+.budgets__row, .budgets__add, .budgets__empty { padding: var(--space-5); }
+.budgets__category { overflow-wrap: anywhere; }
+.budgets__amounts { display: grid; gap: var(--space-3); margin-block: var(--space-4); }
+.budgets__amounts dt { color: var(--muted-text); font-weight: 400; }
+.budgets__amounts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.budgets__over { color: var(--danger-color); }
+.budgets__editor { display: flex; flex-direction: column; gap: var(--space-3); }
+.budgets__field { min-width: 0; }
+.budgets__field label { display: block; margin-bottom: var(--space-2); overflow-wrap: anywhere; }
+.budgets__field .errorlist { color: var(--danger-color); }
+@media (min-width: 768px) {
+  .budgets__header { grid-template-columns: 1fr auto; align-items: start; }
+  .budgets__amounts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .budgets__editor { flex-direction: row; flex-wrap: wrap; align-items: end; }
+  .budgets__field { flex: 1; }
+}

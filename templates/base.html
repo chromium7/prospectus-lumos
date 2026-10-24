@@ -71,6 +71,9 @@
                         Add transaction
                     </a>
 
+                    <a class="nav-link {% if selected_tab == 'app_budgets' %}active{% endif %}" href="{% url 'app:budgets' %}"{% if selected_tab == 'app_budgets' %} aria-current="page"{% endif %}>
+                        <i class="bi bi-wallet2 me-2" aria-hidden="true"></i>Monthly budgets
+                    </a>
                     <p class="sidebar-heading mt-4">Existing tools</p>
                     <a class="nav-link {% if selected_tab == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
                         <i class="bi bi-speedometer2 me-2"></i>
@@ -161,6 +164,7 @@
                 <i class="bi bi-three-dots" aria-hidden="true"></i><span>More</span>
             </button>
             <ul class="dropdown-menu dropdown-menu-end mobile-more-menu">
+                <li><a class="dropdown-item" href="{% url 'app:budgets' %}"{% if selected_tab == 'app_budgets' %} aria-current="page"{% endif %}>Monthly budgets</a></li>
                 <li><a class="dropdown-item" href="{% url 'dashboard' %}">Dashboard</a></li>
                 <li><a class="dropdown-item" href="{% url 'portfolio_analyzer' %}">Portfolio Analyzer</a></li>
                 <li><a class="dropdown-item" href="{% url 'income_analyzer' %}">Income Analyzer</a></li>

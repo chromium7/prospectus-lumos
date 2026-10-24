@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% load static formatting %}
+{% block title %}Monthly budgets - Prospectus Lumos{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/budgets.css' %}">{% endblock %}
+{% block content %}
+<div class="budgets">
+    <header class="budgets__header">
+        <div><h1 class="h2">Monthly budgets</h1><p class="text-muted">Set category limits and compare them with your spending. All amounts are in IDR.</p></div>
+        <form method="get" class="budgets__month">
+            {{ month_form.month.label_tag }}
+            {{ month_form.month }}
+            {{ month_form.month.errors }}
+            <button class="btn btn-outline-primary" type="submit">View month</button>
+        </form>
+    </header>
+    {% if invalid_month %}
+    <div class="alert alert-danger" role="alert">Choose a valid month using YYYY-MM.</div>
+    {% else %}
+    <nav class="budgets__navigation" aria-label="Budget month navigation">
+        {% if previous_month %}<a href="{% url 'app:budgets' %}?month={{ previous_month }}">Previous month</a>{% endif %}
+        <h2 class="h4 mb-0">{{ period|date:"F Y" }}</h2>
+        {% if next_month %}<a href="{% url 'app:budgets' %}?month={{ next_month }}">Next month</a>{% endif %}
+    </nav>
+    {% if error %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endif %}
+    <p class="text-muted">Actual spending includes manual and imported expenses assigned to this month. Categories without a limit remain visible.</p>
+    <section aria-label="Category budgets" class="budgets__rows">
+        {% for row in rows %}
+        <article class="card budgets__row">
+            <h3 class="h5 budgets__category">{{ row.actual.category }}</h3>
+            <dl class="budgets__amounts">
+                <div><dt>Budget</dt><dd>{% if row.actual.budget is not None %}{{ row.actual.budget|idr }}{% else %}No limit{% endif %}</dd></div>
+                <div><dt>Actual</dt><dd>{{ row.actual.actual|idr }}</dd></div>
+                <div><dt>{% if row.actual.over %}Over budget{% else %}Remaining{% endif %}</dt><dd{% if row.actual.over %} class="budgets__over"{% endif %}>{% if row.actual.over %}{{ row.actual.over|idr }}{% elif row.actual.remaining is not None %}{{ row.actual.remaining|idr }}{% else %}No limit{% endif %}</dd></div>
+            </dl>
+            <form method="post" action="{% url 'app:budgets' %}?month={{ month }}" class="budgets__editor">
+                {% csrf_token %}
+                <input type="hidden" name="prefix" value="{{ row.form.prefix }}">
+                {{ row.form.category }}
+                {{ row.form.category.errors }}
+                {{ row.form.non_field_errors }}
+                <div class="budgets__field"><label for="{{ row.form.amount.id_for_label }}">Limit for {{ row.actual.category }} (IDR)</label>{{ row.form.amount }}{{ row.form.amount.errors }}</div>
+                <button class="btn btn-primary" name="action" value="save" type="submit">Save limit</button>
+                {% if row.actual.budget is not None %}<button class="btn btn-outline-danger" name="action" value="remove" type="submit" formnovalidate>Remove limit</button>{% endif %}
+            </form>
+        </article>
+        {% empty %}
+        {% if not error %}<div class="card empty-state budgets__empty"><h3 class="h5">No budgets or spending yet</h3><p class="mb-0">Add your first category limit below to plan this month.</p></div>{% endif %}
+        {% endfor %}
+    </section>
+    <section class="card budgets__add" aria-labelledby="add-budget-title">
+        <h2 class="h4" id="add-budget-title">Add a category limit</h2>
+        <p class="text-muted">An existing category updates its limit. A zero limit is allowed.</p>
+        <form method="post" action="{% url 'app:budgets' %}?month={{ month }}" class="budgets__editor">
+            {% csrf_token %}
+            <input type="hidden" name="prefix" value="{{ form.prefix }}">
+            {{ form.non_field_errors }}
+            {% for field in form %}<div class="budgets__field">{{ field.label_tag }}{{ field }}{{ field.errors }}</div>{% endfor %}
+            <button class="btn btn-primary" type="submit" name="action" value="save">Save limit</button>
+        </form>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}
+{% block extra_js %}{% endblock %}
