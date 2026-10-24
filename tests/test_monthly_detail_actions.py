@@ -46,6 +46,69 @@ class MonthlyDetailActionsTests(TestCase):
         self.assertNotContains(response, 'aria-label="Edit: Electricity"')
         self.assertNotContains(response, "Download CSV")
 
+    def test_origin_filter_includes_legacy_imports_without_direct_user(self) -> None:
+        for origin, expected in (
+            ("manual", self.manual),
+            ("google_sheets", self.imported),
+            ("direct_upload", self.uploaded),
+        ):
+            with self.subTest(origin=origin):
+                response = self.client.get(self.detail_url, {"origin": origin})
+                self.assertEqual(list(response.context["transactions"]), [expected])
+                self.assertContains(response, f'value="{origin}" selected')
+                # Summary cards continue to describe the entire month.
+                self.assertEqual(response.context["document"].total_expenses, Decimal("425000"))
+
+    def test_type_origin_and_amount_sort_compose_and_survive_sort_link(self) -> None:
+        cheaper = self.make_transaction("manual", "Bus fare", "5000")
+        self.make_transaction("manual", "Refund", "10000", "income")
+        filters = {"origin": "manual", "transaction_type": "expense", "sort": "amount", "direction": "asc"}
+        response = self.client.get(self.detail_url, filters)
+        self.assertEqual(list(response.context["transactions"]), [cheaper, self.manual])
+        self.assertContains(response, "direction=desc&transaction_type=expense&origin=manual")
+        filters["direction"] = "desc"
+        response = self.client.get(self.detail_url, filters)
+        self.assertEqual(list(response.context["transactions"]), [self.manual, cheaper])
+        self.assertContains(response, "direction=asc&transaction_type=expense&origin=manual")
+
+    def test_no_matches_explains_filters_and_clear_restores_all_origins(self) -> None:
+        response = self.client.get(self.detail_url, {"origin": "google_sheets", "transaction_type": "expense"})
+        self.assertContains(response, "No transactions match these filters")
+        self.assertNotContains(response, "This document does not contain any transactions yet")
+        response = self.client.get(self.detail_url)
+        self.assertEqual(set(response.context["transactions"]), {self.manual, self.imported, self.uploaded})
+
+    def test_invalid_origin_reports_error_and_keeps_document_scope(self) -> None:
+        other = User.objects.create_user(username="another-owner")
+        other_document = resolve_monthly_document(user=other, year=2026, month=10)
+        Transaction.objects.create(
+            document=other_document,
+            origin="google_sheets",
+            transaction_type="expense",
+            date="2026-10-01",
+            description="Private activity",
+            amount=1,
+        )
+        response = self.client.get(self.detail_url, {"origin": "unknown", "transaction_type": "income"})
+        self.assertContains(response, 'role="alert"')
+        self.assertContains(response, "Choose a valid filter")
+        self.assertEqual(set(response.context["transactions"]), {self.manual, self.imported, self.uploaded})
+        self.assertNotContains(response, "Private activity")
+        self.assertEqual(self.client.get(reverse("document_detail", args=[other_document.pk])).status_code, 404)
+
+    def test_month_navigation_and_type_filter_keep_imported_activity_accessible(self) -> None:
+        response = self.client.get(reverse("document_list"), {"year": "2026", "month": "10"})
+        self.assertContains(response, self.detail_url)
+        self.assertContains(response, "Manual entries")
+        self.assertNotContains(response, "Manual Upload")
+        self.assertNotContains(response, reverse("download_csv", args=[self.document.pk]))
+        response = self.client.get(self.detail_url, {"transaction_type": "expense"})
+        self.assertEqual(set(response.context["transactions"]), {self.manual, self.uploaded})
+        self.document.csv_file = "documents/csv/import.csv"
+        self.document.save(update_fields=["csv_file"])
+        response = self.client.get(reverse("document_list"))
+        self.assertContains(response, reverse("download_csv", args=[self.document.pk]))
+
     def test_confirmation_get_is_safe_and_post_refreshes_month_and_dashboard(self) -> None:
         response = self.client.get(self.delete_url)
         self.assertContains(response, "Delete manual transaction?")
