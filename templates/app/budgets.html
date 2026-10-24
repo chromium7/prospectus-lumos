@@ -9,7 +9,6 @@
         <form method="get" class="budgets__month">
             {{ month_form.month.label_tag }}
             {{ month_form.month }}
-            {{ month_form.month.errors }}
             <button class="btn btn-outline-primary" type="submit">View month</button>
         </form>
     </header>
@@ -61,4 +60,3 @@
     {% endif %}
 </div>
 {% endblock %}
-{% block extra_js %}{% endblock %}

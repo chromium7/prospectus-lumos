@@ -45,7 +45,11 @@ class BudgetLimitForm(forms.Form):
 @require_http_methods(["GET", "POST"])
 def monthly_budgets_view(request: TypedHttpRequest) -> HttpResponse:
     """Display and edit the authenticated user's category limits for one month."""
-    month_form = BudgetMonthForm(request.GET or {"month": timezone.localdate().strftime("%Y-%m")})
+    month_form = BudgetMonthForm(
+        {
+            "month": request.GET.get("month", timezone.localdate().strftime("%Y-%m")),
+        }
+    )
     if not month_form.is_valid():
         return render(
             request,
@@ -106,7 +110,8 @@ def monthly_budgets_view(request: TypedHttpRequest) -> HttpResponse:
         actuals = get_monthly_budget_actuals(user=request.user, year=period.year, month=period.month)
     except (InterfaceError, OperationalError):
         logger.exception("Budget read failed for user %s", request.user.pk)
-        error = "We couldn't load this month's budgets. Please try again."
+        read_error = "We couldn't load this month's budgets. Please try again."
+        error = f"{error} {read_error}" if error else read_error
         status = 503
     else:
         for index, row in enumerate(actuals):
