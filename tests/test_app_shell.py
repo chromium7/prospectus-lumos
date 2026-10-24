@@ -32,6 +32,7 @@ class AppShellTests(TestCase):
         self.assertContains(response, f'href="{reverse("portfolio_analyzer")}"')
         self.assertContains(response, f'href="{reverse("category_analyzer")}"')
         self.assertContains(response, f'href="{reverse("freedom_plan_list")}"')
+        self.assertContains(response, f'href="{reverse("app:budgets")}"', count=2)
         self.assertContains(response, "data-offline-banner")
         self.assertContains(response, "data-app-live-region")
         self.assertContains(response, 'class="dropdown-menu dropdown-menu-end profile-menu"')
@@ -41,7 +42,7 @@ class AppShellTests(TestCase):
 
         response = self.client.get(reverse("app:home"))
 
-        for dropped in ('/app/transactions"', "/app/budgets/", "/app/reports"):
+        for dropped in ('/app/transactions"', "/app/reports"):
             self.assertNotContains(response, dropped)
 
     def test_navigation_offers_the_add_transaction_page_on_desktop_and_mobile(self) -> None:
